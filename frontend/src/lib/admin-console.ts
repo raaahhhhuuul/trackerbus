@@ -12,7 +12,7 @@ export interface AdminBus {
   routeName: string;
   plate: string;
   status: BusStatus;
-  assignedDriverUserId: string | null;
+  assignedDriverId: string | null;
   assignedDriverName: string | null;
   assignedDriverLoginId: string | null;
   updatedAt: string;
@@ -29,6 +29,7 @@ export interface ApprovedStudent {
   id: string;
   name: string;
   email: string;
+  assignedBusId: string | null;
   createdAt: string;
 }
 
@@ -61,7 +62,6 @@ export interface ActiveTripAdminItem {
   createdAt: string;
 }
 
-// Pending approval type for admin console
 export interface PendingLoginApproval {
   requestId: string;
   requestedAt: string;
@@ -71,78 +71,41 @@ export interface PendingLoginApproval {
   email: string;
 }
 
-/**
- * Fetch pending login approvals (admin)
- */
 export async function getPendingApprovals(): Promise<PendingLoginApproval[]> {
   const { data, error } = await supabase
-    .from("login_approvals")
-    .select(
-      `
-      id,
-      registration_id,
-      user_id,
-      role,
-      status,
-      requested_at,
-      registrations(name, email)
-    `,
-    )
+    .from("registrations")
+    .select("id, user_id, name, email, role, requested_at")
     .eq("status", "pending")
     .order("requested_at", { ascending: false });
-
-  console.log("APPROVAL FETCH:", data);
-  console.log("APPROVAL ERROR:", error);
 
   if (error) {
     if (isMissingSupabaseTableError(error)) return [];
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((item: any) => {
-    const reg = Array.isArray(item.registrations) ? item.registrations[0] : item.registrations;
-    return {
-      requestId: item.id as string,
-      requestedAt: item.requested_at as string,
-      userId: item.user_id as string,
-      role: item.role as "student" | "driver",
-      name: String(reg?.name ?? "Unknown"),
-      email: String(reg?.email ?? "N/A"),
-    } as PendingLoginApproval;
-  });
+  return (data ?? []).map((item: any) => ({
+    requestId: item.id as string,
+    requestedAt: item.requested_at as string,
+    userId: item.user_id as string,
+    role: item.role as "student" | "driver",
+    name: String(item.name ?? "Unknown"),
+    email: String(item.email ?? "N/A"),
+  }));
 }
 
-/**
- * Approve a pending request: insert into students/drivers and update statuses
- */
 export async function approveRequest(requestId: string): Promise<boolean> {
-  console.log("APPROVAL FETCH: start", requestId);
+  const response = await fetch("/api/approve", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: requestId }),
+  });
 
-  const { data: requestRow, error: requestError } = await supabase
-    .from("login_approvals")
-    .select("id, registration_id, user_id, role, status, requested_at")
-    .eq("id", requestId)
-    .maybeSingle();
+  const payload = (await response.json()) as { success: boolean; error?: string };
+  if (!response.ok || !payload.success) {
+    throw new Error(payload.error ?? "Approval failed");
+  }
 
-  console.log("APPROVAL FETCH RESULT:", requestRow);
-  console.log("APPROVAL FETCH ERROR:", requestError);
-
-  if (requestError) throw new Error(requestError.message);
-  if (!requestRow) throw new Error("Approval request not found");
-
-  const { data: updatedRecord, error: approvalUpdateError } = await supabase
-    .from("login_approvals")
-    .update({ status: "approved" })
-    .eq("id", requestId)
-    .select("id, registration_id, user_id, role, status, requested_at")
-    .maybeSingle();
-
-  console.log("APPROVE UPDATE RESULT:", updatedRecord);
-
-  if (approvalUpdateError) throw new Error(approvalUpdateError.message);
-
-  console.log("APPROVED USER:", requestId);
-  return Boolean(updatedRecord ?? requestRow);
+  return true;
 }
 
 interface BusRow {
@@ -151,7 +114,7 @@ interface BusRow {
   route_name: string;
   plate: string;
   status: BusStatus;
-  assigned_driver_user_id: string | null;
+  assigned_driver_id: string | null;
   updated_at: string;
 }
 
@@ -166,6 +129,7 @@ interface StudentRow {
   id: string;
   name: string;
   email: string;
+  assigned_bus_id: string | null;
   created_at: string;
 }
 
@@ -268,7 +232,7 @@ function buildSeedBuses(count = 48): AdminBus[] {
       routeName: routes[index % routes.length],
       plate: `TN-${String(10 + (index % 20)).padStart(2, "0")}-AB-${String(2000 + number)}`,
       status: "active",
-      assignedDriverUserId: null,
+      assignedDriverId: null,
       assignedDriverName: null,
       assignedDriverLoginId: null,
       updatedAt: new Date().toISOString(),
@@ -283,15 +247,15 @@ function applyDriverAssignments(
     route_name: string;
     plate: string;
     status: BusStatus;
-    assigned_driver_user_id: string | null;
+    assigned_driver_id: string | null;
     updated_at: string;
   }>,
   drivers: Map<string, Pick<DriverRow, "name" | "email">>,
   activeBusNumbers: Set<string>,
 ): AdminBus[] {
   return buses.map((bus) => {
-    const assignedDriver = bus.assigned_driver_user_id
-      ? drivers.get(bus.assigned_driver_user_id)
+    const assignedDriver = bus.assigned_driver_id
+      ? drivers.get(bus.assigned_driver_id)
       : null;
 
     return {
@@ -300,7 +264,7 @@ function applyDriverAssignments(
       routeName: bus.route_name,
       plate: bus.plate,
       status: activeBusNumbers.has(bus.bus_number) ? "active" : bus.status,
-      assignedDriverUserId: bus.assigned_driver_user_id,
+      assignedDriverId: bus.assigned_driver_id,
       assignedDriverName: assignedDriver?.name ?? null,
       assignedDriverLoginId: assignedDriver?.email ?? null,
       updatedAt: bus.updated_at,
@@ -336,7 +300,7 @@ async function getDriverMap(driverIds: string[]) {
 export async function getApprovedStudents(): Promise<ApprovedStudent[]> {
   const { data, error } = await supabase
     .from("students")
-    .select("id, name, email, created_at")
+    .select("id, name, email, assigned_bus_id, created_at")
     .order("name", { ascending: true });
 
   if (error) {
@@ -350,9 +314,29 @@ export async function getApprovedStudents(): Promise<ApprovedStudent[]> {
         id: student.id,
         name: student.name,
         email: student.email,
+        assignedBusId: student.assigned_bus_id,
         createdAt: student.created_at,
       }) satisfies ApprovedStudent,
   );
+}
+
+export async function assignStudentToBus(
+  studentId: string,
+  busId: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const response = await fetch("/api/assign-student-bus", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ studentId, busId }),
+  });
+
+  const payload = (await response.json()) as { success: boolean; error?: string };
+
+  if (!response.ok || !payload.success) {
+    return { ok: false, error: payload.error ?? "Assignment failed" };
+  }
+
+  return { ok: true };
 }
 
 export async function getBuses() {
@@ -361,7 +345,7 @@ export async function getBuses() {
 
   const { data: buses, error: busError } = await supabase
     .from("buses")
-    .select("id, bus_number, route_name, plate, status, assigned_driver_user_id, updated_at")
+    .select("id, bus_number, route_name, plate, status, assigned_driver_id, updated_at")
     .order("bus_number", { ascending: true });
 
   if (busError) {
@@ -371,14 +355,14 @@ export async function getBuses() {
         Array.from(
           new Set(
             localBuses
-              .map((bus) => bus.assignedDriverUserId)
+              .map((bus) => bus.assignedDriverId)
               .filter((id): id is string => typeof id === "string" && id.length > 0),
           ),
         ),
       );
       return localBuses.map((bus) => {
-        const assignedDriver = bus.assignedDriverUserId
-          ? driverMap.get(bus.assignedDriverUserId)
+        const assignedDriver = bus.assignedDriverId
+          ? driverMap.get(bus.assignedDriverId)
           : null;
 
         return {
@@ -397,7 +381,7 @@ export async function getBuses() {
     Array.from(
       new Set(
         busRows
-          .map((bus) => bus.assigned_driver_user_id)
+          .map((bus) => bus.assigned_driver_id)
           .filter((id): id is string => typeof id === "string" && id.length > 0),
       ),
     ),
@@ -416,7 +400,7 @@ export async function seedDefaultBuses(count = 48) {
     route_name: bus.routeName,
     plate: bus.plate,
     status: bus.status,
-    assigned_driver_user_id: null,
+    assigned_driver_id: null,
     updated_at: bus.updatedAt,
   }));
 
@@ -463,16 +447,14 @@ export async function getApprovedDrivers(): Promise<ApprovedDriver[]> {
 export async function assignDriverToBus(busId: string, driverUserId: string | null) {
   if (!busId) throw new Error("Bus ID is required.");
 
-  console.log("assignDriverToBus incoming:", { busId, driverUserId });
-
   const nowIso = new Date().toISOString();
   const localBuses = getLocalBuses();
   if (localBuses.length > 0) {
     const updatedLocal = localBuses.map((bus) => {
-      if (driverUserId && bus.assignedDriverUserId === driverUserId && bus.id !== busId) {
+      if (driverUserId && bus.assignedDriverId === driverUserId && bus.id !== busId) {
         return {
           ...bus,
-          assignedDriverUserId: null,
+          assignedDriverId: null,
           assignedDriverName: null,
           assignedDriverLoginId: null,
           updatedAt: nowIso,
@@ -481,7 +463,7 @@ export async function assignDriverToBus(busId: string, driverUserId: string | nu
       if (bus.id !== busId) return bus;
       return {
         ...bus,
-        assignedDriverUserId: driverUserId,
+        assignedDriverId: driverUserId,
         assignedDriverName: null,
         assignedDriverLoginId: null,
         updatedAt: nowIso,
@@ -493,10 +475,7 @@ export async function assignDriverToBus(busId: string, driverUserId: string | nu
   const response = await fetch("/api/assign", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      busId,
-      driverId: driverUserId,
-    }),
+    body: JSON.stringify({ busId, driverId: driverUserId }),
   });
 
   const payload = (await response.json()) as { success: boolean; error?: string };
@@ -504,51 +483,42 @@ export async function assignDriverToBus(busId: string, driverUserId: string | nu
     return { ok: false, error: payload.error ?? "Assignment failed" };
   }
 
-  console.log("assignDriverToBus update result:", payload);
   return { ok: true };
 }
 
 export async function getAssignedBusForDriver(driverUserId: string) {
-  console.log("getAssignedBusForDriver incoming:", { driverUserId });
   if (!driverUserId) return null;
 
   const { data, error } = await supabase
     .from("buses")
-    .select("id, bus_number, route_name, plate, status, assigned_driver_user_id, updated_at")
-    .eq("assigned_driver_user_id", driverUserId)
+    .select("id, bus_number, route_name, plate, status, assigned_driver_id, updated_at")
+    .eq("assigned_driver_id", driverUserId)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle<BusRow>();
 
   if (error) {
     if (isMissingSupabaseTableError(error)) {
-      const local = getLocalBuses().find((bus) => bus.assignedDriverUserId === driverUserId) ?? null;
-      console.log("getAssignedBusForDriver result (local fallback):", local);
-      return local;
+      return getLocalBuses().find((bus) => bus.assignedDriverId === driverUserId) ?? null;
     }
     throw new Error(error.message);
   }
 
   if (!data) {
-    const local = getLocalBuses().find((bus) => bus.assignedDriverUserId === driverUserId) ?? null;
-    console.log("getAssignedBusForDriver result (local):", local);
-    return local;
+    return getLocalBuses().find((bus) => bus.assignedDriverId === driverUserId) ?? null;
   }
 
-  const result = {
+  return {
     id: data.id,
     busNumber: data.bus_number,
     routeName: data.route_name,
     plate: data.plate,
     status: data.status,
-    assignedDriverUserId: data.assigned_driver_user_id,
+    assignedDriverId: data.assigned_driver_id,
     assignedDriverName: null,
     assignedDriverLoginId: null,
     updatedAt: data.updated_at,
   } satisfies AdminBus;
-
-  console.log("getAssignedBusForDriver result (remote):", result);
-  return result;
 }
 
 export async function getOperationQueue() {
@@ -605,7 +575,7 @@ export async function getActiveTrips(): Promise<ActiveTripAdminItem[]> {
 
 export async function getAdminNotifications() {
   const { data, error } = await supabase
-    .from("admin_notifications")
+    .from("notifications")
     .select("id, title, message, target_role, created_at")
     .order("created_at", { ascending: false })
     .limit(20);
@@ -647,7 +617,7 @@ export async function sendAdminNotification(input: {
 
   saveLocalNotifications([fallbackNotification, ...getLocalNotifications()].slice(0, 50));
 
-  const { error } = await supabase.from("admin_notifications").insert({
+  const { error } = await supabase.from("notifications").insert({
     title,
     message,
     target_role: input.targetRole,

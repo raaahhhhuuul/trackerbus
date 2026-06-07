@@ -1,24 +1,27 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertCircle, Bus, Lock, Mail, Loader2, Truck, UserRound } from "lucide-react";
+import { AlertCircle, Bus, GraduationCap, Lock, Mail, Loader2, Truck, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { getSession, signUpUser, type RegistrableRole } from "@/lib/auth";
+import { getSession, signUpUser } from "@/lib/auth";
+
+function detectRole(email: string): "student" | "driver" {
+  return email.trim().toLowerCase().endsWith("@srmist.edu.in") ? "student" : "driver";
+}
 
 export function SignUpPage() {
   const navigate = useNavigate();
-  const [role, setRole] = useState<RegistrableRole>("student");
   const [name, setName] = useState("");
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const role = detectRole(loginId);
+
   useEffect(() => {
     const session = getSession();
-    if (session) {
-      navigate("/", { replace: true });
-    }
+    if (session) navigate("/", { replace: true });
   }, [navigate]);
 
   const handleSubmit = (event: FormEvent) => {
@@ -26,11 +29,6 @@ export function SignUpPage() {
 
     if (!name || !loginId || !password || !confirmPassword) {
       toast.error("Please fill all fields.");
-      return;
-    }
-
-    if (role === "student" && !loginId.trim().toLowerCase().endsWith("@srmist.edu.in")) {
-      toast.error("Student signup requires @srmist.edu.in email.");
       return;
     }
 
@@ -47,16 +45,10 @@ export function SignUpPage() {
     setLoading(true);
     window.setTimeout(async () => {
       try {
-        await signUpUser({
-          name,
-          loginId,
-          role,
-          password,
-        });
-
+        await signUpUser({ name, loginId, role, password });
         setLoading(false);
         toast.success("Signup submitted", {
-          description: "Account created successfully. Approval request sent to admin.",
+          description: "Your request has been sent to admin for approval.",
         });
         navigate("/login");
       } catch (error) {
@@ -88,81 +80,68 @@ export function SignUpPage() {
               <Bus className="h-7 w-7 text-primary-foreground" strokeWidth={2.5} />
             </div>
             <h1 className="font-display text-2xl font-bold tracking-tight">Create account</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Register as student or driver</p>
-          </div>
-
-          <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-border bg-surface p-1.5">
-            <button
-              type="button"
-              onClick={() => setRole("student")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                role === "student"
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }`}
-            >
-              Student Signup
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole("driver")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                role === "driver"
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }`}
-            >
-              Driver Signup
-            </button>
+            <p className="mt-1 text-sm text-muted-foreground">
+              SRM students use <span className="font-semibold text-foreground">@srmist.edu.in</span>{" "}
+              · Drivers use any other email
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
-            <Field
-              icon={<UserRound className="h-4 w-4" />}
-              label="Full name"
-            >
+            <Field icon={<UserRound className="h-4 w-4" />} label="Full name">
               <input
                 type="text"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your full name"
                 className="w-full bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
             </Field>
-            <Field
-              icon={
-                role === "student" ? <Mail className="h-4 w-4" /> : <Truck className="h-4 w-4" />
-              }
-              label={role === "student" ? "Student email" : "Driver email"}
-            >
+
+            <Field icon={<Mail className="h-4 w-4" />} label="Email address">
               <input
                 type="email"
                 value={loginId}
-                onChange={(event) => setLoginId(event.target.value)}
-                placeholder={role === "student" ? "name@srmist.edu.in" : "driver@company.com"}
+                onChange={(e) => setLoginId(e.target.value)}
+                placeholder="your@email.com"
                 className="w-full bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
             </Field>
-            <Field
-              icon={<Lock className="h-4 w-4" />}
-              label="Password"
-            >
+
+            {loginId.trim().length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3.5 py-2.5"
+              >
+                {role === "student" ? (
+                  <GraduationCap className="h-4 w-4 text-primary" />
+                ) : (
+                  <Truck className="h-4 w-4 text-primary" />
+                )}
+                <span className="text-sm text-muted-foreground">
+                  Signing up as{" "}
+                  <span className="font-semibold text-foreground">
+                    {role === "student" ? "Student (SRM)" : "Driver"}
+                  </span>
+                </span>
+              </motion.div>
+            )}
+
+            <Field icon={<Lock className="h-4 w-4" />} label="Password">
               <input
                 type="password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Password"
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min 6 characters"
                 className="w-full bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
             </Field>
-            <Field
-              icon={<Lock className="h-4 w-4" />}
-              label="Confirm password"
-            >
+
+            <Field icon={<Lock className="h-4 w-4" />} label="Confirm password">
               <input
                 type="password"
                 value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm password"
                 className="w-full bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none"
               />

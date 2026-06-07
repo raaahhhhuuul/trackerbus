@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth";
 import {
   assignDriverToBus,
+  assignStudentToBus,
   getActiveTrips,
   getAdminNotifications,
   getApprovedDrivers,
@@ -24,6 +25,7 @@ import {
   type AdminBus,
   type AdminNotification,
   type ApprovedDriver,
+  type ApprovedStudent,
   type NotificationTargetRole,
   type OperationQueueItem,
 } from "@/lib/admin-console";
@@ -40,6 +42,7 @@ export function AdminDashboard() {
 
   const [showBusList, setShowBusList] = useState(false);
   const [assigningBusId, setAssigningBusId] = useState<string | null>(null);
+  const [assigningStudentId, setAssigningStudentId] = useState<string | null>(null);
 
   const [notificationTitle, setNotificationTitle] = useState("");
   const [notificationMessage, setNotificationMessage] = useState("");
@@ -185,6 +188,26 @@ export function AdminDashboard() {
       });
     } finally {
       setAssigningBusId(null);
+    }
+  };
+
+  const handleAssignStudentBus = async (studentId: string, busId: string | null) => {
+    try {
+      setAssigningStudentId(studentId);
+      const result = await assignStudentToBus(studentId, busId);
+      if (!result.ok) {
+        toast.error("Unable to assign bus to student", { description: result.error });
+        return;
+      }
+      const latestStudents = await getApprovedStudents();
+      setStudents(latestStudents);
+      toast.success("Student bus assignment updated");
+    } catch (error) {
+      toast.error("Unable to assign bus to student", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setAssigningStudentId(null);
     }
   };
 
@@ -367,7 +390,7 @@ export function AdminDashboard() {
 
                   <select
                     className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
-                    value={bus.assignedDriverUserId ?? ""}
+                    value={bus.assignedDriverId ?? ""}
                     onChange={(event) => {
                       const value = event.target.value.trim();
                       void handleAssignDriver(bus.id, value.length > 0 ? value : null);
@@ -390,18 +413,40 @@ export function AdminDashboard() {
         <section className="rounded-2xl border border-border bg-card p-4 shadow-card sm:p-5">
           <div className="mb-3 flex items-center gap-2">
             <UserRoundCog className="h-5 w-5 text-primary" />
-            <h2 className="font-display text-xl font-bold">Approved Students</h2>
+            <h2 className="font-display text-xl font-bold">Assign Bus to Students</h2>
           </div>
           {students.length === 0 ? (
             <p className="rounded-xl border border-border bg-surface p-3 text-sm text-muted-foreground">
               No approved students yet.
             </p>
+          ) : buses.length === 0 ? (
+            <p className="rounded-xl border border-border bg-surface p-3 text-sm text-muted-foreground">
+              No buses available to assign.
+            </p>
           ) : (
-            <div className="space-y-2.5">
-              {students.map((student) => (
+            <div className="space-y-2">
+              {(students as ApprovedStudent[]).map((student) => (
                 <div key={student.id} className="rounded-xl border border-border bg-surface p-3">
-                  <p className="text-sm font-semibold text-foreground">{student.name}</p>
-                  <p className="text-xs text-muted-foreground">{student.email}</p>
+                  <div className="mb-2">
+                    <p className="text-sm font-semibold text-foreground">{student.name}</p>
+                    <p className="text-xs text-muted-foreground">{student.email}</p>
+                  </div>
+                  <select
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                    value={student.assignedBusId ?? ""}
+                    onChange={(event) => {
+                      const value = event.target.value.trim();
+                      void handleAssignStudentBus(student.id, value.length > 0 ? value : null);
+                    }}
+                    disabled={assigningStudentId === student.id}
+                  >
+                    <option value="">No bus assigned</option>
+                    {buses.map((bus) => (
+                      <option key={bus.id} value={bus.id}>
+                        {bus.busNumber} — {bus.routeName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               ))}
             </div>

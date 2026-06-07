@@ -7,18 +7,31 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies (all workspace node_modules)
 node_modules
+frontend/node_modules
+backend/node_modules
+
+# Build outputs
 dist
+frontend/dist
 dist-ssr
+
+# Local env files — contain secrets, never commit
+*.local
+backend/.env
+frontend/.env
+
+# Misc
 .output
 .vinxi
 .tanstack/**
 .nitro
-*.local
 
-# Wrangler / Cloudflare
+# Cloudflare / Vercel (not used)
 .wrangler/
 .dev.vars
+.vercel
 
 # Editor directories and files
 .vscode/*
@@ -30,5 +43,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-.vercel
+.claude

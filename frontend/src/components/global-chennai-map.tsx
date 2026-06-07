@@ -3,6 +3,7 @@ import "leaflet/dist/leaflet.css";
 import { useLiveTracking } from "@/hooks/use-live-tracking";
 import { useStudentLocation } from "@/hooks/use-student-location";
 import { useStudentRouteFeed } from "@/hooks/use-student-route-feed";
+import { useStudentBus } from "@/hooks/use-student-bus";
 import { getSession } from "@/lib/auth";
 
 type ReactLeafletModule = typeof import("react-leaflet");
@@ -15,9 +16,11 @@ export function GlobalChennaiMap({ className }: { className?: string }) {
   const [leafletReady, setLeafletReady] = useState(false);
   const [reactLeaflet, setReactLeaflet] = useState<ReactLeafletModule | null>(null);
   const [leafletModule, setLeafletModule] = useState<LeafletModule | null>(null);
-  const { tracking } = useLiveTracking(3000);
   const session = getSession();
   const isStudentView = session?.role === "student";
+  const { busInfo } = useStudentBus();
+  const driverUserIdForMap = isStudentView ? (busInfo?.driverUserId ?? null) : undefined;
+  const { tracking } = useLiveTracking(driverUserIdForMap);
   const { location: studentLocation } = useStudentLocation({
     enabled: isStudentView,
     watch: isStudentView,

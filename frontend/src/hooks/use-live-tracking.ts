@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import {
   getCachedDriverTracking,
   getLatestDriverTracking,
+  getTrackingForDriver,
   subscribeToDriverTracking,
   type LiveTrackingRecord,
 } from "@/lib/live-tracking";
 
-export function useLiveTracking(refreshMs = 3000) {
+export function useLiveTracking(driverUserId?: string | null, refreshMs = 3000) {
   const [tracking, setTracking] = useState<LiveTrackingRecord | null>(() =>
     getCachedDriverTracking(),
   );
@@ -16,7 +17,9 @@ export function useLiveTracking(refreshMs = 3000) {
     let isMounted = true;
 
     const sync = async () => {
-      const latest = await getLatestDriverTracking();
+      const latest = driverUserId
+        ? await getTrackingForDriver(driverUserId)
+        : await getLatestDriverTracking();
       if (!isMounted) return;
       setTracking(latest);
       setLoading(false);
@@ -24,11 +27,15 @@ export function useLiveTracking(refreshMs = 3000) {
 
     void sync();
 
-    const unsubscribe = subscribeToDriverTracking((next) => {
-      if (!isMounted) return;
-      setTracking(next);
-      setLoading(false);
-    });
+    // Only subscribe to global events when not filtering by driver
+    let unsubscribe: (() => void) | undefined;
+    if (!driverUserId) {
+      unsubscribe = subscribeToDriverTracking((next) => {
+        if (!isMounted) return;
+        setTracking(next);
+        setLoading(false);
+      });
+    }
 
     const timer = window.setInterval(() => {
       void sync();
@@ -36,10 +43,10 @@ export function useLiveTracking(refreshMs = 3000) {
 
     return () => {
       isMounted = false;
-      unsubscribe();
+      unsubscribe?.();
       window.clearInterval(timer);
     };
-  }, [refreshMs]);
+  }, [driverUserId, refreshMs]);
 
   return { tracking, loading };
 }

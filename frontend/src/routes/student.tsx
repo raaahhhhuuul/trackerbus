@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bus, Gauge, Route as RouteIcon, MapPin, Clock, Radio } from "lucide-react";
+import { Bus, Gauge, Route as RouteIcon, MapPin, Clock, Radio, AlertCircle } from "lucide-react";
 import { getHomeRouteForRole, getSession } from "@/lib/auth";
 import { useLiveTracking } from "../hooks/use-live-tracking";
 import { useRoleNotifications } from "../hooks/use-role-notifications";
 import { useStudentLocation } from "../hooks/use-student-location";
+import { useStudentBus } from "../hooks/use-student-bus";
 import { clearStudentRoute, saveStudentRoute, type StudentRouteRecord } from "../lib/student-route";
 import { getActiveTripSummary, getDriverTripStartLocation, type ActiveTripSummary } from "../lib/live-tracking";
 import { haversineKm } from "@/lib/utils";
@@ -12,7 +13,8 @@ import { haversineKm } from "@/lib/utils";
 export function StudentDashboard() {
   const navigate = useNavigate();
   const [studentName, setStudentName] = useState("Student");
-  const { tracking, loading } = useLiveTracking();
+  const { busInfo, loading: busLoading } = useStudentBus();
+  const { tracking, loading } = useLiveTracking(busInfo?.driverUserId);
   const { notifications, loading: notificationsLoading } = useRoleNotifications("student");
   const { location: studentLocation, error: studentLocationError } = useStudentLocation({
     watch: false,
@@ -271,6 +273,38 @@ export function StudentDashboard() {
     driverStartLocation?.lng,
   ]);
 
+  if (busLoading) {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-5 sm:py-5">
+        <header className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-card">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Student dashboard</p>
+          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight">Welcome, {studentName}!</h1>
+          <p className="mt-2 text-sm text-muted-foreground animate-pulse">Loading your bus assignment…</p>
+        </header>
+      </div>
+    );
+  }
+
+  if (!busInfo) {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-5 sm:py-5">
+        <header className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-card">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Student dashboard</p>
+          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight">Welcome, {studentName}!</h1>
+        </header>
+        <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5 shadow-card">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-warning shrink-0" />
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-warning">No Bus Assigned</p>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your account is approved but admin hasn't assigned you to a bus yet. Please contact admin to get your bus number assigned.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full lg:h-[calc(100vh-4rem)] overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-5 sm:py-5">
@@ -282,6 +316,10 @@ export function StudentDashboard() {
           <h1 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">
             Welcome, {studentName}!
           </h1>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">
+            {busInfo.busNumber} · {busInfo.routeName}
+            {!busInfo.driverUserId && " · No driver assigned yet"}
+          </p>
         </header>
 
         <div className="space-y-4">

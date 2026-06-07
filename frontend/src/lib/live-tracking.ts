@@ -240,11 +240,11 @@ async function getOperationEventContext(userId: string) {
   let busNumber: string | null = null;
 
   const [{ data: driverData }, { data: assignedBuses }] = await Promise.all([
-    supabase.from("drivers").select("name").eq("user_id", userId).maybeSingle<DriverProfileRow>(),
+    supabase.from("drivers").select("name").eq("id", userId).maybeSingle<DriverProfileRow>(),
     supabase
       .from("buses")
       .select("id, bus_number")
-      .eq("assigned_driver_user_id", userId)
+      .eq("assigned_driver_id", userId)
       .order("updated_at", { ascending: false })
       .limit(1),
   ]);
@@ -567,6 +567,25 @@ export async function getActiveTripSummary(): Promise<ActiveTripSummary | null> 
       longitude: isValidNumber(data.longitude) ? data.longitude : null,
       startedAt: data.created_at,
     };
+  } catch {
+    return null;
+  }
+}
+
+export async function getTrackingForDriver(
+  driverUserId: string,
+): Promise<LiveTrackingRecord | null> {
+  try {
+    const { data, error } = await supabase
+      .from("driver_live_tracking")
+      .select(
+        "user_id, latitude, longitude, speed_kmh, distance_km, is_active, started_at, updated_at",
+      )
+      .eq("user_id", driverUserId)
+      .maybeSingle<RemoteTrackingRow>();
+
+    if (error || !data) return null;
+    return toRecordFromRemote(data);
   } catch {
     return null;
   }

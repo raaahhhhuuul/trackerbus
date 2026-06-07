@@ -324,58 +324,51 @@ export async function signUpUser(input: SignUpInput): Promise<RegisteredUser> {
 
   const remoteUserId = authData.user?.id ?? userId;
 
-  const { data: registrationData, error: registrationError } = await supabase
-    .from("registrations")
-    .upsert(
-      {
+  // Write registration + approval through the server API (uses service-role key,
+  // bypassing RLS which would block an unauthenticated anon call).
+  let registrationId: string | null = null;
+  let approvalWritten = false;
+
+  try {
+    const signupResponse = await fetch("/api/signup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email: loginId, role: input.role, userId: remoteUserId }),
+    });
+    if (signupResponse.ok) {
+      const payload = (await signupResponse.json()) as { ok: boolean; registrationId?: string };
+      registrationId = payload.registrationId ?? null;
+      approvalWritten = true;
+    }
+  } catch {
+    // Server unreachable — fall through to direct Supabase attempt
+  }
+
+  if (!approvalWritten) {
+    // Direct Supabase fallback (works when user is auto-confirmed after signUp)
+    const { data: regData, error: regFallbackError } = await supabase
+      .from("registrations")
+      .upsert(
+        { user_id: remoteUserId, name, email: loginId, role: input.role, status: "pending" },
+        { onConflict: "user_id" },
+      )
+      .select("id")
+      .maybeSingle<{ id: string }>();
+    registrationId = regData?.id ?? null;
+
+    if (regFallbackError) {
+      upsertLocalPendingApproval({
+        id: `local-approval-${remoteUserId}`,
+        registrationId: registrationId ?? remoteUserId,
+        userId: remoteUserId,
         name,
         email: loginId,
-      },
-      { onConflict: "email" },
-    )
-    .select("id, name, email")
-    .maybeSingle();
-
-  if (registrationError && !isMissingSupabaseTableError(registrationError) && !isSupabaseWriteAccessError(registrationError)) {
-    throw new Error(registrationError.message);
-  }
-
-  const registrationId = registrationData?.id ?? remoteUserId;
-
-  const { error: approvalError } = await supabase.from("login_approvals").insert({
-    registration_id: registrationId,
-    user_id: remoteUserId,
-    role: input.role,
-    status: "pending",
-  });
-
-  if (approvalError && !isMissingSupabaseTableError(approvalError) && !isSupabaseWriteAccessError(approvalError)) {
-    upsertLocalPendingApproval({
-      id: `local-approval-${remoteUserId}`,
-      registrationId,
-      userId: remoteUserId,
-      name,
-      email: loginId,
-      role: input.role,
-      status: "pending",
-      requestedAt: nowIso,
-      approvedAt: null,
-    });
-    throw new Error(approvalError.message);
-  }
-
-  if (approvalError) {
-    upsertLocalPendingApproval({
-      id: `local-approval-${remoteUserId}`,
-      registrationId,
-      userId: remoteUserId,
-      name,
-      email: loginId,
-      role: input.role,
-      status: "pending",
-      requestedAt: nowIso,
-      approvedAt: null,
-    });
+        role: input.role,
+        status: "pending",
+        requestedAt: nowIso,
+        approvedAt: null,
+      });
+    }
   }
 
   upsertLocalCredential({
@@ -430,25 +423,14 @@ export async function signIn(loginId: string, password: string): Promise<AuthRes
   console.log("LOGIN RESPONSE:", data, error);
 
   if (error || !data.user) {
-    const localCredential =
-      getLocalCredentials().find(
-        (item) => item.loginId === normalizedLoginId && item.password === normalizedPassword,
-      ) ?? null;
-
-    if (localCredential) {
-      const localApproved =
-        getLocalApprovedAccounts().find((item) => item.userId === localCredential.userId) ?? null;
-      if (localApproved) {
-        const session = setSession(localApproved.role, localApproved.email, undefined, {
-          userId: localApproved.userId,
-          loginId: localApproved.email,
-          displayName: localApproved.displayName,
-        });
-        return { session, homeRoute: getHomeRouteForRole(localApproved.role) };
-      }
+    const msg = (error?.message ?? "").toLowerCase();
+    if (msg.includes("email not confirmed") || msg.includes("email_not_confirmed")) {
+      throw new Error("Your email hasn't been verified yet. Please wait a moment and try again.");
     }
-
-    throw new Error("User not approved yet. Please contact admin.");
+    if (msg.includes("invalid login credentials") || msg.includes("invalid_credentials")) {
+      throw new Error("Incorrect email or password.");
+    }
+    throw new Error(error?.message ?? "Login failed. Please try again.");
   }
 
   const loginEmail = normalizeLoginId(data.user.email ?? normalizedLoginId);
@@ -504,16 +486,8 @@ export async function getPendingApprovals(): Promise<PendingLoginApproval[]> {
   }
 
   const { data, error } = await supabase
-    .from("login_approvals")
-    .select(`
-      id,
-      registration_id,
-      user_id,
-      role,
-      status,
-      requested_at,
-      registrations(name, email)
-    `)
+    .from("registrations")
+    .select("id, user_id, name, email, role, requested_at")
     .eq("status", "pending")
     .order("requested_at", { ascending: false });
 
@@ -533,17 +507,14 @@ export async function getPendingApprovals(): Promise<PendingLoginApproval[]> {
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((item: any) => {
-    const registration = Array.isArray(item.registrations) ? item.registrations[0] : item.registrations;
-    return {
-      requestId: item.id as string,
-      requestedAt: item.requested_at as string,
-      userId: item.user_id as string,
-      name: String(registration?.name ?? "Unknown"),
-      email: String(registration?.email ?? "N/A"),
-      role: item.role as RegistrableRole,
-    } satisfies PendingLoginApproval;
-  });
+  return (data ?? []).map((item: any) => ({
+    requestId: item.id as string,
+    requestedAt: item.requested_at as string,
+    userId: item.user_id as string,
+    name: String(item.name ?? "Unknown"),
+    email: String(item.email ?? "N/A"),
+    role: item.role as RegistrableRole,
+  } satisfies PendingLoginApproval));
 }
 
 export async function approveUser(requestId: string) {
