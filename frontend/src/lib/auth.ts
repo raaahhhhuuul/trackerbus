@@ -347,14 +347,18 @@ export async function signUpUser(input: SignUpInput): Promise<RegisteredUser> {
     },
   });
 
-  if (authError && !isSupabaseAuthRateLimitError(authError)) {
+  if (authError) {
+    // Surface all errors — never swallow them. Rate limit errors get a user-friendly message.
+    if (isSupabaseAuthRateLimitError(authError)) {
+      throw new Error("Too many signup attempts. Please wait a few minutes and try again.");
+    }
     throw new Error(authError.message);
   }
 
   const remoteUserId = authData.user?.id;
-  if (!remoteUserId) {
-    // Supabase returns user:null (no error) when the email is already registered
-    // and confirmed — it hides the existence of the account to prevent enumeration.
+  // Supabase anti-enumeration: for an already-confirmed email it returns a fake user
+  // with identities:[] instead of an error. A genuine new signup always has ≥1 identity.
+  if (!remoteUserId || authData.user?.identities?.length === 0) {
     throw new Error("This email is already registered. Please sign in instead.");
   }
 
