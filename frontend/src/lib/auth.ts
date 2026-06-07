@@ -26,6 +26,8 @@ export interface RegisteredUser {
   email: string;
   role: RegistrableRole;
   createdAt: string;
+  /** true when Supabase requires the user to click the verification email */
+  emailConfirmationRequired: boolean;
 }
 
 export interface PendingLoginApproval {
@@ -246,6 +248,7 @@ export function getLocalApprovedDriverAccounts(): RegisteredUser[] {
       email: item.email,
       role: "driver" as const,
       createdAt: new Date().toISOString(),
+      emailConfirmationRequired: false,
     }));
 }
 
@@ -386,7 +389,13 @@ export async function signUpUser(input: SignUpInput): Promise<RegisteredUser> {
     email: loginId,
     role: input.role,
     createdAt: nowIso,
+    emailConfirmationRequired: !authData.session,
   };
+}
+
+export async function resendVerificationEmail(email: string): Promise<void> {
+  const { error } = await supabase.auth.resend({ type: "signup", email });
+  if (error) throw new Error(error.message);
 }
 
 export async function signIn(loginId: string, password: string): Promise<AuthResult> {

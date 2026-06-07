@@ -37,12 +37,16 @@ export function SignUpPage() {
     setLoading(true);
     window.setTimeout(async () => {
       try {
-        await signUpUser({ name, loginId, role, password });
+        const result = await signUpUser({ name, loginId, role, password });
         setLoading(false);
-        toast.success("Request submitted", {
-          description: "Admin will review and approve your account.",
-        });
-        navigate("/login");
+        if (result.emailConfirmationRequired) {
+          navigate(`/verify-email?email=${encodeURIComponent(loginId)}`, { replace: true });
+        } else {
+          toast.success("Request submitted", {
+            description: "Admin will review and approve your account.",
+          });
+          navigate("/login");
+        }
       } catch (error) {
         setLoading(false);
         toast.error("Signup failed", {

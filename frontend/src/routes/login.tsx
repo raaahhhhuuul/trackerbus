@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertCircle, Bus, Eye, EyeOff, Lock, Loader2, Mail, UserPlus } from "lucide-react";
+import { AlertCircle, Bus, Eye, EyeOff, Lock, Loader2, Mail, UserPlus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { getHomeRouteForRole, getSession, signIn } from "@/lib/auth";
+import { getHomeRouteForRole, getSession, resendVerificationEmail, signIn } from "@/lib/auth";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -12,6 +12,8 @@ export function LoginPage() {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     const session = getSession();
@@ -42,11 +44,35 @@ export function LoginPage() {
         navigate(homeRoute);
       } catch (error) {
         setLoading(false);
-        toast.error("Unable to sign in", {
-          description: error instanceof Error ? error.message : "Check credentials and try again.",
-        });
+        const msg = error instanceof Error ? error.message : "";
+        if (msg.toLowerCase().includes("verified") || msg.toLowerCase().includes("confirmed")) {
+          setUnverifiedEmail(email.trim());
+          toast.error("Email not verified", {
+            description: "Click the verification link we emailed you, then try again.",
+          });
+        } else {
+          setUnverifiedEmail(null);
+          toast.error("Unable to sign in", {
+            description: msg || "Check credentials and try again.",
+          });
+        }
       }
     }, 600);
+  };
+
+  const handleResend = async () => {
+    if (!unverifiedEmail || resending) return;
+    setResending(true);
+    try {
+      await resendVerificationEmail(unverifiedEmail);
+      toast.success("Verification email sent", {
+        description: `Check ${unverifiedEmail} for a new link.`,
+      });
+    } catch {
+      toast.error("Could not resend. Try again shortly.");
+    } finally {
+      setResending(false);
+    }
   };
 
   return (
@@ -123,6 +149,32 @@ export function LoginPage() {
               Sign in to your portal to continue.
             </p>
           </div>
+
+          {/* Unverified email banner */}
+          {unverifiedEmail && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 flex items-start gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/8 px-4 py-3"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-yellow-300">Email not verified</p>
+                <p className="mt-0.5 text-xs text-yellow-300/70">
+                  Check your inbox for the verification link.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-yellow-300 hover:text-yellow-200 disabled:opacity-60"
+                >
+                  {resending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  {resending ? "Sending…" : "Resend verification email"}
+                </button>
+              </div>
+            </motion.div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <AuthField label="Login ID / Email" icon={<Mail className="h-4 w-4" />} error={errors.email}>
