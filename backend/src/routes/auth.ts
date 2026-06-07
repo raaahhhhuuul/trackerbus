@@ -219,4 +219,99 @@ router.post("/account-status", async (req, res) => {
   res.json({ ok: true, status: "pending" });
 });
 
+// POST /api/student-bus — return the bus assigned to a student (service role, bypasses RLS)
+router.post("/student-bus", async (req, res) => {
+  const { userId } = req.body as { userId?: string };
+
+  if (!userId) {
+    res.status(400).json({ ok: false, error: "Missing userId" });
+    return;
+  }
+
+  const { data: student, error: studentError } = await db
+    .from("students")
+    .select("assigned_bus_id")
+    .eq("id", userId)
+    .maybeSingle<{ assigned_bus_id: string | null }>();
+
+  if (studentError) {
+    res.status(500).json({ ok: false, error: studentError.message });
+    return;
+  }
+
+  if (!student?.assigned_bus_id) {
+    res.json({ ok: true, busId: null, busNumber: null, routeName: null, driverUserId: null });
+    return;
+  }
+
+  const { data: bus, error: busError } = await db
+    .from("buses")
+    .select("id, bus_number, route_name, assigned_driver_id")
+    .eq("id", student.assigned_bus_id)
+    .maybeSingle<{
+      id: string;
+      bus_number: string;
+      route_name: string;
+      assigned_driver_id: string | null;
+    }>();
+
+  if (busError) {
+    res.status(500).json({ ok: false, error: busError.message });
+    return;
+  }
+
+  if (!bus) {
+    res.json({ ok: true, busId: null, busNumber: null, routeName: null, driverUserId: null });
+    return;
+  }
+
+  res.json({
+    ok: true,
+    busId: bus.id,
+    busNumber: bus.bus_number,
+    routeName: bus.route_name,
+    driverUserId: bus.assigned_driver_id,
+  });
+});
+
+// POST /api/driver-bus — return the bus assigned to a driver (service role, bypasses RLS)
+router.post("/driver-bus", async (req, res) => {
+  const { userId } = req.body as { userId?: string };
+
+  if (!userId) {
+    res.status(400).json({ ok: false, error: "Missing userId" });
+    return;
+  }
+
+  const { data: bus, error } = await db
+    .from("buses")
+    .select("id, bus_number, route_name, assigned_driver_id")
+    .eq("assigned_driver_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{
+      id: string;
+      bus_number: string;
+      route_name: string;
+      assigned_driver_id: string | null;
+    }>();
+
+  if (error) {
+    res.status(500).json({ ok: false, error: error.message });
+    return;
+  }
+
+  if (!bus) {
+    res.json({ ok: true, busId: null, busNumber: null, routeName: null });
+    return;
+  }
+
+  res.json({
+    ok: true,
+    busId: bus.id,
+    busNumber: bus.bus_number,
+    routeName: bus.route_name,
+  });
+});
+
 export default router;

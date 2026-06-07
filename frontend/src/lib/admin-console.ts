@@ -490,6 +490,43 @@ export async function assignDriverToBus(busId: string, driverUserId: string | nu
 export async function getAssignedBusForDriver(driverUserId: string) {
   if (!driverUserId) return null;
 
+  // Use backend API (service role) so Supabase RLS never blocks the read
+  try {
+    const res = await fetch(apiUrl("/api/driver-bus"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId: driverUserId }),
+    });
+
+    if (res.ok) {
+      const payload = (await res.json()) as {
+        ok: boolean;
+        busId: string | null;
+        busNumber: string | null;
+        routeName: string | null;
+      };
+
+      if (payload.ok && payload.busId) {
+        return {
+          id: payload.busId,
+          busNumber: payload.busNumber ?? payload.busId,
+          routeName: payload.routeName ?? "Unknown Route",
+          plate: "",
+          status: "active" as const,
+          assignedDriverId: driverUserId,
+          assignedDriverName: null,
+          assignedDriverLoginId: null,
+          updatedAt: new Date().toISOString(),
+        } satisfies AdminBus;
+      }
+
+      return null;
+    }
+  } catch {
+    // fall through to Supabase fallback
+  }
+
+  // Supabase fallback (works when backend is unreachable)
   const { data, error } = await supabase
     .from("buses")
     .select("id, bus_number, route_name, plate, status, assigned_driver_id, updated_at")
@@ -498,14 +535,7 @@ export async function getAssignedBusForDriver(driverUserId: string) {
     .limit(1)
     .maybeSingle<BusRow>();
 
-  if (error) {
-    if (isMissingSupabaseTableError(error)) {
-      return getLocalBuses().find((bus) => bus.assignedDriverId === driverUserId) ?? null;
-    }
-    throw new Error(error.message);
-  }
-
-  if (!data) {
+  if (error || !data) {
     return getLocalBuses().find((bus) => bus.assignedDriverId === driverUserId) ?? null;
   }
 
