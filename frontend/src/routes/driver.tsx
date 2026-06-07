@@ -6,6 +6,7 @@ import {
   Clock,
   Gauge,
   Loader2,
+  Map,
   MapPin,
   Navigation,
   Route as RouteIcon,
@@ -19,6 +20,7 @@ import { saveDriverTracking, stopDriverTracking } from "../lib/live-tracking";
 import { useRoleNotifications } from "../hooks/use-role-notifications";
 import { getAssignedBusForDriver } from "../lib/admin-console";
 import { haversineKm } from "@/lib/utils";
+import { DriverPositionMap } from "@/components/driver-position-map";
 
 export function DriverPanel() {
   const navigate = useNavigate();
@@ -294,6 +296,25 @@ export function DriverPanel() {
               <p className="text-xs font-medium text-success">Broadcasting live location every 3s</p>
             </div>
           )}
+        </div>
+
+        {/* Live map */}
+        <div className="rounded-2xl border border-border/50 gradient-card overflow-hidden shadow-card">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/30">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+              <Map className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <p className="text-sm font-bold">Live Location</p>
+            {active && (
+              <span className="ml-auto flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-success">
+                <span className="inline-block h-1.5 w-1.5 rounded-full status-online" />
+                Broadcasting
+              </span>
+            )}
+          </div>
+          <div className="p-2">
+            <DriverPositionMap coords={coords} active={active} />
+          </div>
         </div>
 
         {/* Stats grid */}

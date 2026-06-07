@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle, XCircle, Loader2, Bus, ArrowRight, Mail } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Bus, ArrowRight, Mail, Clock, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type Status = "loading" | "success" | "error";
 
 export function AuthConfirmPage() {
-  const navigate = useNavigate();
   const { search } = useLocation();
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState("");
@@ -19,8 +18,8 @@ export function AuthConfirmPage() {
     settledRef.current = true;
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setStatus("success");
-    window.setTimeout(() => navigate("/login", { replace: true }), 4000);
-  }, [navigate]);
+    // No auto-redirect — user should read the admin-approval message and sign in manually.
+  }, []);
 
   const fail = useCallback((msg: string) => {
     if (settledRef.current) return;
@@ -129,28 +128,62 @@ export function AuthConfirmPage() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="space-y-4"
+              className="space-y-5"
             >
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-green-500/15">
                 <CheckCircle className="h-10 w-10 text-green-400" strokeWidth={1.5} />
               </div>
-              <h2 className="font-display text-2xl font-bold text-green-400">Email verified!</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Your email address is confirmed. Your account is pending admin approval — you'll
-                be able to sign in once approved.
-              </p>
+              <div>
+                <h2 className="font-display text-2xl font-bold text-green-400">Email Verified!</h2>
+                <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                  Your email is confirmed. Now wait for an admin to approve your account.
+                </p>
+              </div>
 
-              <div className="rounded-2xl border border-green-500/20 bg-green-500/8 px-4 py-3 text-xs text-green-300/80 leading-relaxed">
-                Redirecting to sign in automatically in a few seconds…
+              {/* Step indicator */}
+              <div className="rounded-2xl border border-border/60 bg-surface/60 p-4 space-y-3 text-left">
+                {/* Step 1 — done */}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-green-500/20">
+                    <CheckCircle className="h-4 w-4 text-green-400" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-green-400">Email Verified</p>
+                    <p className="text-[10px] text-muted-foreground">Your email address is confirmed</p>
+                  </div>
+                </div>
+                {/* Step 2 — pending */}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+                    <Clock className="h-4 w-4 text-amber-400" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-400">Waiting for Admin Approval</p>
+                    <p className="text-[10px] text-muted-foreground">Admin will review and approve your account</p>
+                  </div>
+                </div>
+                {/* Step 3 — future */}
+                <div className="flex items-center gap-3 opacity-40">
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary/15">
+                    <ShieldCheck className="h-4 w-4 text-primary" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold">Sign In &amp; Access Portal</p>
+                    <p className="text-[10px] text-muted-foreground">Available once your account is approved</p>
+                  </div>
+                </div>
               </div>
 
               <Link
                 to="/login"
                 className="flex w-full items-center justify-center gap-2 rounded-2xl gradient-primary py-3 text-sm font-bold text-white shadow-glow transition-all hover:opacity-90 active:scale-[0.98]"
               >
-                Sign In Now
+                Go to Sign In
                 <ArrowRight className="h-4 w-4" />
               </Link>
+              <p className="text-[10px] text-center text-muted-foreground">
+                Sign in after your admin has approved your account to access your portal.
+              </p>
             </motion.div>
           )}
 

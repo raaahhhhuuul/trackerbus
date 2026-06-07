@@ -259,6 +259,7 @@ export function StudentDashboard() {
       {/* Full-screen map — pass override so map tracks the selected bus's driver */}
       <GlobalChennaiMap
         driverUserIdOverride={isOnOverride ? (effectiveBusInfo?.driverUserId ?? null) : undefined}
+        allBuses={allBuses}
       />
 
       {/* Top info bar */}
