@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
 @source "../src";
 @import "tw-animate-css";
@@ -15,7 +15,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-3xl: calc(var(--radius) + 16px);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -44,207 +44,195 @@
   --color-surface: var(--surface);
   --color-surface-elevated: var(--surface-elevated);
 
-  --shadow-soft: 0 2px 8px -2px color-mix(in oklab, var(--primary) 10%, transparent);
-  --shadow-elegant: 0 8px 20px -12px color-mix(in oklab, var(--primary) 20%, transparent);
-  --shadow-glow: 0 0 18px color-mix(in oklab, var(--primary-glow) 22%, transparent);
-  --shadow-card: 0 4px 20px -4px oklch(0 0 0 / 0.08);
+  --shadow-soft: 0 2px 8px -2px oklch(0 0 0 / 0.4);
+  --shadow-elegant: 0 8px 32px -8px oklch(0 0 0 / 0.6);
+  --shadow-glow: 0 0 24px oklch(0.62 0.22 240 / 0.35);
+  --shadow-glow-cyan: 0 0 24px oklch(0.72 0.18 195 / 0.4);
+  --shadow-card: 0 4px 24px -4px oklch(0 0 0 / 0.5);
 }
 
+/* ── Dark Navy Command Center Theme (default) ─────────────── */
 :root {
-  --radius: 1rem;
+  --radius: 0.75rem;
 
-  --background: oklch(0.985 0.005 240);
-  --foreground: oklch(0.18 0.04 260);
+  --background: oklch(0.09 0.028 240);
+  --foreground: oklch(0.96 0.008 230);
 
-  --surface: oklch(1 0 0);
-  --surface-elevated: oklch(0.99 0.005 240);
+  --surface: oklch(0.12 0.032 240);
+  --surface-elevated: oklch(0.16 0.038 238);
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.04 260);
+  --card: oklch(0.13 0.034 238);
+  --card-foreground: oklch(0.96 0.008 230);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.04 260);
+  --popover: oklch(0.13 0.034 238);
+  --popover-foreground: oklch(0.96 0.008 230);
 
-  --primary: oklch(0.45 0.22 270);
+  --primary: oklch(0.62 0.22 240);
   --primary-foreground: oklch(0.99 0 0);
-  --primary-glow: oklch(0.62 0.22 265);
+  --primary-glow: oklch(0.72 0.2 240);
 
-  --secondary: oklch(0.96 0.01 250);
-  --secondary-foreground: oklch(0.25 0.05 260);
+  --secondary: oklch(0.18 0.04 238);
+  --secondary-foreground: oklch(0.82 0.01 230);
 
-  --muted: oklch(0.96 0.01 250);
-  --muted-foreground: oklch(0.5 0.02 260);
+  --muted: oklch(0.17 0.035 238);
+  --muted-foreground: oklch(0.52 0.02 240);
 
-  --accent: oklch(0.72 0.18 200);
-  --accent-foreground: oklch(0.15 0.05 260);
+  --accent: oklch(0.72 0.18 195);
+  --accent-foreground: oklch(0.09 0.028 240);
 
-  --destructive: oklch(0.6 0.24 25);
+  --destructive: oklch(0.62 0.24 25);
   --destructive-foreground: oklch(0.99 0 0);
 
-  --success: oklch(0.68 0.17 155);
+  --success: oklch(0.65 0.17 155);
   --success-foreground: oklch(0.99 0 0);
 
-  --warning: oklch(0.78 0.16 70);
-  --warning-foreground: oklch(0.2 0.05 60);
+  --warning: oklch(0.76 0.16 70);
+  --warning-foreground: oklch(0.15 0.04 60);
 
-  --border: oklch(0.92 0.01 250);
-  --input: oklch(0.94 0.01 250);
-  --ring: oklch(0.55 0.2 270);
+  --border: oklch(0.28 0.06 238 / 0.5);
+  --input: oklch(0.18 0.04 238 / 0.8);
+  --ring: oklch(0.62 0.22 240);
 
-  --gradient-primary: linear-gradient(135deg, oklch(0.45 0.22 270), oklch(0.62 0.22 265));
-  --gradient-hero: linear-gradient(
-    135deg,
-    oklch(0.35 0.2 275) 0%,
-    oklch(0.55 0.22 260) 50%,
-    oklch(0.72 0.18 200) 100%
-  );
-  --gradient-map: linear-gradient(180deg, oklch(0.96 0.015 230) 0%, oklch(0.92 0.02 220) 100%);
-  --gradient-glass: linear-gradient(135deg, oklch(1 0 0 / 0.85), oklch(1 0 0 / 0.65));
-}
-
-.dark {
-  --background: oklch(0.2 0.012 15);
-  --foreground: oklch(0.95 0.008 25);
-
-  --surface: oklch(0.24 0.014 16);
-  --surface-elevated: oklch(0.28 0.016 16);
-
-  --card: oklch(0.24 0.014 16);
-  --card-foreground: oklch(0.95 0.008 25);
-
-  --popover: oklch(0.24 0.014 16);
-  --popover-foreground: oklch(0.95 0.008 25);
-
-  --primary: oklch(0.63 0.08 23);
-  --primary-foreground: oklch(0.96 0.01 20);
-  --primary-glow: oklch(0.68 0.08 23);
-
-  --secondary: oklch(0.33 0.035 23);
-  --secondary-foreground: oklch(0.95 0.008 25);
-
-  --muted: oklch(0.29 0.015 20);
-  --muted-foreground: oklch(0.74 0.008 25);
-
-  --accent: oklch(0.56 0.06 18);
-  --accent-foreground: oklch(0.95 0.008 25);
-
-  --destructive: oklch(0.65 0.24 25);
-  --destructive-foreground: oklch(0.99 0 0);
-
-  --success: oklch(0.68 0.11 150);
-  --success-foreground: oklch(0.95 0.008 25);
-
-  --warning: oklch(0.78 0.13 70);
-  --warning-foreground: oklch(0.2 0.05 60);
-
-  --border: oklch(0.82 0.01 25 / 0.18);
-  --input: oklch(0.83 0.012 25 / 0.22);
-  --ring: oklch(0.63 0.08 23);
-
-  --gradient-primary: linear-gradient(135deg, oklch(0.59 0.075 23), oklch(0.66 0.075 22));
-  --gradient-hero: linear-gradient(140deg, oklch(0.3 0.022 19), oklch(0.24 0.014 16));
-  --gradient-map: linear-gradient(180deg, oklch(0.25 0.014 16) 0%, oklch(0.21 0.012 15) 100%);
-  --gradient-glass: linear-gradient(
-    135deg,
-    oklch(0.27 0.014 16 / 0.88),
-    oklch(0.23 0.012 15 / 0.72)
-  );
+  --gradient-primary: linear-gradient(135deg, oklch(0.52 0.22 245), oklch(0.68 0.2 230));
+  --gradient-hero: linear-gradient(135deg, oklch(0.09 0.028 240) 0%, oklch(0.14 0.04 245) 50%, oklch(0.1 0.05 260) 100%);
+  --gradient-card: linear-gradient(145deg, oklch(0.15 0.036 238), oklch(0.12 0.03 242));
+  --gradient-glass: linear-gradient(135deg, oklch(0.18 0.04 238 / 0.85), oklch(0.12 0.03 242 / 0.7));
 }
 
 @layer base {
   * {
     border-color: var(--color-border);
+    box-sizing: border-box;
   }
 
-  html,
-  body {
+  html, body {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    overflow-x: hidden;
   }
 
-  h1,
-  h2,
-  h3,
-  h4 {
+  h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.28 0.06 238 / 0.6);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.38 0.1 238 / 0.8);
   }
 }
 
 @layer utilities {
+  /* Glass morphism */
   .glass {
     background: var(--gradient-glass);
-    backdrop-filter: blur(14px) saturate(130%);
-    -webkit-backdrop-filter: blur(14px) saturate(130%);
-    border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid oklch(0.4 0.08 238 / 0.25);
   }
 
-  .gradient-primary {
-    background: var(--gradient-primary);
+  .glass-light {
+    background: oklch(0.16 0.038 238 / 0.7);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid oklch(0.35 0.07 238 / 0.3);
   }
 
-  .gradient-hero {
-    background: var(--gradient-hero);
-  }
-
-  .gradient-map-bg {
-    background: var(--gradient-map);
-  }
+  /* Gradients */
+  .gradient-primary { background: var(--gradient-primary); }
+  .gradient-hero    { background: var(--gradient-hero); }
+  .gradient-card    { background: var(--gradient-card); }
 
   .text-gradient {
-    background: var(--gradient-primary);
+    background: linear-gradient(135deg, oklch(0.72 0.2 240), oklch(0.78 0.18 195));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .text-gradient-gold {
+    background: linear-gradient(135deg, oklch(0.82 0.17 75), oklch(0.88 0.14 65));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
 
-  .shadow-card {
-    box-shadow: var(--shadow-card);
+  /* Shadows */
+  .shadow-card    { box-shadow: var(--shadow-card); }
+  .shadow-elegant { box-shadow: var(--shadow-elegant); }
+  .shadow-glow    { box-shadow: var(--shadow-glow); }
+  .shadow-glow-cyan { box-shadow: var(--shadow-glow-cyan); }
+
+  /* Status indicators */
+  .status-online  { background: oklch(0.65 0.17 155); box-shadow: 0 0 8px oklch(0.65 0.17 155 / 0.6); }
+  .status-offline { background: oklch(0.52 0.02 240); }
+  .status-warning { background: oklch(0.76 0.16 70);  box-shadow: 0 0 8px oklch(0.76 0.16 70 / 0.6); }
+
+  /* Glow border */
+  .border-glow {
+    border: 1px solid oklch(0.62 0.22 240 / 0.5);
+    box-shadow: 0 0 16px oklch(0.62 0.22 240 / 0.15), inset 0 0 16px oklch(0.62 0.22 240 / 0.05);
   }
-  .shadow-elegant {
+  .border-glow-cyan {
+    border: 1px solid oklch(0.72 0.18 195 / 0.5);
+    box-shadow: 0 0 16px oklch(0.72 0.18 195 / 0.15), inset 0 0 16px oklch(0.72 0.18 195 / 0.05);
+  }
+
+  /* Interactive */
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
     box-shadow: var(--shadow-elegant);
   }
-  .shadow-glow {
-    box-shadow: var(--shadow-glow);
+
+  /* Dot grid background */
+  .dot-grid {
+    background-image: radial-gradient(oklch(0.35 0.05 238 / 0.5) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* Line grid background */
+  .line-grid {
+    background-image:
+      linear-gradient(oklch(0.25 0.05 238 / 0.3) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.25 0.05 238 / 0.3) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 }
 
-/* Map grid pattern */
-.map-grid {
-  background-image:
-    linear-gradient(color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px),
-    linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
-      transparent 1px
-    );
-  background-size: 40px 40px;
-}
+/* ── Keyframe animations ─────────────────────────────────── */
 
-/* Pulsing pin */
 @keyframes pulse-ring {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(2.4);
-    opacity: 0;
-  }
+  0%   { transform: scale(0.8); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0; }
 }
-.pulse-ring {
-  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.pulse-ring { animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+@keyframes ping-slow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.08); opacity: 0.85; }
 }
+.ping-slow { animation: ping-slow 2s ease-in-out infinite; }
 
 @keyframes dash-flow {
-  to {
-    stroke-dashoffset: -24;
-  }
+  to { stroke-dashoffset: -24; }
 }
 .route-dash {
   stroke-dasharray: 8 6;
@@ -252,14 +240,104 @@
 }
 
 @keyframes float-y {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
 }
-.float-y {
-  animation: float-y 3s ease-in-out infinite;
+.float-y { animation: float-y 3.5s ease-in-out infinite; }
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+.slide-up { animation: slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fade-in { animation: fade-in 0.3s ease both; }
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px oklch(0.62 0.22 240 / 0.3); }
+  50%      { box-shadow: 0 0 40px oklch(0.62 0.22 240 / 0.6), 0 0 80px oklch(0.62 0.22 240 / 0.2); }
+}
+.glow-pulse { animation: glow-pulse 2.5s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg,
+    oklch(0.17 0.035 238) 25%,
+    oklch(0.22 0.045 238) 50%,
+    oklch(0.17 0.035 238) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+.spin-slow { animation: spin-slow 3s linear infinite; }
+
+/* Bus marker pulsing for active buses */
+@keyframes bus-active-pulse {
+  0%, 100% { filter: drop-shadow(0 0 6px oklch(0.72 0.18 195 / 0.8)); }
+  50%      { filter: drop-shadow(0 0 14px oklch(0.72 0.18 195 / 1)); }
+}
+.bus-active { animation: bus-active-pulse 2s ease-in-out infinite; }
+
+/* Stat counter flicker on update */
+@keyframes stat-update {
+  0%   { color: oklch(0.72 0.18 195); }
+  100% { color: inherit; }
+}
+.stat-flash { animation: stat-update 0.6s ease both; }
+
+/* Leaflet overrides for dark theme */
+.leaflet-container {
+  background: oklch(0.09 0.028 240) !important;
+  font-family: var(--font-sans) !important;
+}
+.leaflet-popup-content-wrapper {
+  background: oklch(0.14 0.035 238) !important;
+  color: oklch(0.96 0.008 230) !important;
+  border: 1px solid oklch(0.28 0.06 238 / 0.6) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.6) !important;
+  backdrop-filter: blur(16px);
+}
+.leaflet-popup-tip {
+  background: oklch(0.14 0.035 238) !important;
+}
+.leaflet-popup-close-button {
+  color: oklch(0.52 0.02 240) !important;
+}
+.leaflet-popup-close-button:hover {
+  color: oklch(0.96 0.008 230) !important;
+}
+.leaflet-control-zoom {
+  border: 1px solid oklch(0.28 0.06 238 / 0.5) !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden;
+  box-shadow: 0 4px 16px oklch(0 0 0 / 0.4) !important;
+}
+.leaflet-control-zoom a {
+  background: oklch(0.14 0.035 238) !important;
+  color: oklch(0.82 0.01 230) !important;
+  border-bottom: 1px solid oklch(0.28 0.06 238 / 0.4) !important;
+}
+.leaflet-control-zoom a:hover {
+  background: oklch(0.2 0.05 238) !important;
+  color: oklch(0.96 0.008 230) !important;
+}
+.leaflet-bar a:last-child { border-bottom: none !important; }
+.leaflet-control-attribution {
+  background: oklch(0.12 0.032 240 / 0.8) !important;
+  color: oklch(0.45 0.02 240) !important;
+  font-size: 9px !important;
+  backdrop-filter: blur(8px);
+}
+.leaflet-control-attribution a { color: oklch(0.55 0.1 240) !important; }

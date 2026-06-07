@@ -596,6 +596,41 @@ export async function getNotificationsForRole(role: "student" | "driver") {
   return notifications.filter((note) => note.targetRole === "all" || note.targetRole === role);
 }
 
+export interface DriverPosition {
+  lat: number;
+  lng: number;
+  isActive: boolean;
+  speedKmh: number;
+  updatedAt: string;
+}
+
+export async function getAllDriverPositions(): Promise<Record<string, DriverPosition>> {
+  const { data, error } = await supabase
+    .from("driver_live_tracking")
+    .select("user_id, latitude, longitude, is_active, speed_kmh, updated_at");
+
+  if (error) return {};
+
+  const result: Record<string, DriverPosition> = {};
+  for (const row of (data ?? []) as Array<{
+    user_id: string;
+    latitude: number;
+    longitude: number;
+    is_active: boolean;
+    speed_kmh: number;
+    updated_at: string;
+  }>) {
+    result[row.user_id] = {
+      lat: row.latitude,
+      lng: row.longitude,
+      isActive: row.is_active,
+      speedKmh: row.speed_kmh,
+      updatedAt: row.updated_at,
+    };
+  }
+  return result;
+}
+
 export async function sendAdminNotification(input: {
   title: string;
   message: string;

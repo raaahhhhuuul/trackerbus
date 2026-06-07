@@ -1,5 +1,5 @@
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Bus, User, LogOut, LayoutDashboard } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Bus, LayoutDashboard, LogOut, Shield, Truck, User, GraduationCap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { clearSession, getHomeRouteForRole, getSession, type AuthSession } from "@/lib/auth";
@@ -18,6 +18,18 @@ function roleLabel(role: AuthSession["role"]) {
   return "Admin";
 }
 
+function RoleIcon({ role }: { role: AuthSession["role"] }) {
+  if (role === "student") return <GraduationCap className="h-3.5 w-3.5" />;
+  if (role === "driver") return <Truck className="h-3.5 w-3.5" />;
+  return <Shield className="h-3.5 w-3.5" />;
+}
+
+const ROLE_COLORS: Record<AuthSession["role"], string> = {
+  admin:   "text-primary  bg-primary/15  border-primary/25",
+  driver:  "text-accent   bg-accent/15   border-accent/25",
+  student: "text-success  bg-success/15  border-success/25",
+};
+
 export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -25,11 +37,10 @@ export function Navbar() {
   const isAuthPage = location.pathname === "/login" || location.pathname === "/signup";
 
   useEffect(() => {
-    const syncSession = () => setSession(getSession());
-    syncSession();
-
-    window.addEventListener("storage", syncSession);
-    return () => window.removeEventListener("storage", syncSession);
+    const sync = () => setSession(getSession());
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
   }, [location.pathname]);
 
   const mainRoute = session ? getHomeRouteForRole(session.role) : "/login";
@@ -40,92 +51,101 @@ export function Navbar() {
     try {
       await clearSession();
       setSession(null);
-      toast.success("Logged out", { description: "Please sign in to continue." });
+      toast.success("Logged out");
       navigate("/login");
     } catch {
-      toast.error("Logout failed", { description: "Please try again." });
+      toast.error("Logout failed");
     }
   };
 
   return (
-    <header className="sticky top-0 z-1200 w-full border-b border-border/60 bg-background/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link to={mainRoute} className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow">
-            <Bus className="h-5 w-5 text-primary-foreground" strokeWidth={2.5} />
+    <header className="sticky top-0 z-[1200] w-full border-b border-border/40 bg-surface/80 backdrop-blur-2xl">
+      <div className="mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6">
+
+        {/* Logo */}
+        <Link to={mainRoute} className="flex items-center gap-2.5 group">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow transition-transform group-hover:scale-105">
+            <Bus className="h-5 w-5 text-white" strokeWidth={2.5} />
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-display text-base font-bold tracking-tight">Transporter</span>
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Smart Transit
+            <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Transit Command
             </span>
           </div>
         </Link>
 
-        {!isAuthPage && (
-          <nav className="hidden items-center gap-1 md:flex">
-            {session && <NavItem to={mainRoute} label={`${roleLabel(session.role)} Portal`} />}
-          </nav>
-        )}
+        {/* Right side */}
+        <div className="flex items-center gap-2.5">
 
-        <div className="flex items-center gap-3">
-          {session && (
-            <div className="hidden items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 sm:flex">
+          {/* Live indicator */}
+          {session && !isAuthPage && (
+            <div className="hidden items-center gap-2 rounded-full border border-success/25 bg-success/10 px-3 py-1.5 sm:flex">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
               </span>
-              <span className="text-xs font-medium text-foreground">Live</span>
+              <span className="text-xs font-semibold text-success">Live</span>
             </div>
           )}
+
+          {/* Role badge */}
+          {session && !isAuthPage && (
+            <div
+              className={`hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider sm:flex ${ROLE_COLORS[session.role]}`}
+            >
+              <RoleIcon role={session.role} />
+              {roleLabel(session.role)}
+            </div>
+          )}
+
+          {/* User dropdown / guest button */}
           {session ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex h-9 min-w-9 items-center justify-center rounded-full border border-border bg-surface px-2.5 text-xs font-bold transition-colors hover:bg-secondary"
-                  aria-label="Profile"
-                  title={`${roleLabel(session.role)} account`}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-surface font-display text-sm font-bold transition-colors hover:border-primary/40 hover:bg-secondary"
+                  aria-label="Account menu"
                 >
                   {userInitial}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="z-1300 w-56 border-border bg-card">
-                <DropdownMenuLabel>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <DropdownMenuContent
+                align="end"
+                className="z-[1300] w-60 border-border/60 bg-card shadow-elegant"
+              >
+                <DropdownMenuLabel className="pb-2">
+                  <div
+                    className={`mb-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${ROLE_COLORS[session.role]}`}
+                  >
+                    <RoleIcon role={session.role} />
                     {roleLabel(session.role)} Account
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-foreground">{userDisplay}</p>
-                  <p className="mt-1 text-xs font-normal text-muted-foreground">
+                  </div>
+                  <p className="text-sm font-semibold text-foreground truncate">{userDisplay}</p>
+                  <p className="mt-0.5 text-xs font-normal text-muted-foreground truncate">
                     {session.loginId || session.email}
                   </p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {!isAuthPage ? (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      navigate(mainRoute);
-                    }}
-                  >
+                {!isAuthPage && (
+                  <DropdownMenuItem onSelect={() => navigate(mainRoute)}>
                     <LayoutDashboard className="h-4 w-4" /> Open Portal
                   </DropdownMenuItem>
-                ) : null}
+                )}
                 <DropdownMenuItem
-                  onSelect={() => {
-                    void handleLogout();
-                  }}
+                  onSelect={() => void handleLogout()}
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                 >
-                  <LogOut className="h-4 w-4" /> Logout
+                  <LogOut className="h-4 w-4" /> Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <button
               type="button"
-              className="flex h-9 min-w-9 items-center justify-center rounded-full border border-border bg-surface px-2.5 text-xs font-bold transition-colors hover:bg-secondary"
-              aria-label="Profile"
-              title="Guest"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-surface text-muted-foreground transition-colors hover:bg-secondary"
+              aria-label="Guest"
             >
               <User className="h-4 w-4" />
             </button>
@@ -133,26 +153,5 @@ export function Navbar() {
         </div>
       </div>
     </header>
-  );
-}
-
-function NavItem({
-  to,
-  label,
-}: {
-  to: string;
-  label: string;
-}) {
-  return (
-    <NavLink
-      to={to}
-      className={({ isActive }: { isActive: boolean }) =>
-        `rounded-full px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground ${
-          isActive ? "bg-secondary text-foreground" : "text-muted-foreground"
-        }`
-      }
-    >
-      {label}
-    </NavLink>
   );
 }

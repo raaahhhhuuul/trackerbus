@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bus, Gauge, Route as RouteIcon, MapPin, Clock, Radio, AlertCircle } from "lucide-react";
+import {
+  AlertCircle, Bus, ChevronDown, ChevronUp, Clock, Gauge,
+  MapPin, Radio, Route as RouteIcon,
+} from "lucide-react";
 import { getHomeRouteForRole, getSession } from "@/lib/auth";
+import { GlobalChennaiMap } from "@/components/global-chennai-map";
 import { useLiveTracking } from "../hooks/use-live-tracking";
 import { useRoleNotifications } from "../hooks/use-role-notifications";
 import { useStudentLocation } from "../hooks/use-student-location";
@@ -13,592 +17,352 @@ import { haversineKm } from "@/lib/utils";
 export function StudentDashboard() {
   const navigate = useNavigate();
   const [studentName, setStudentName] = useState("Student");
+  const [sheetOpen, setSheetOpen] = useState(true);
   const { busInfo, loading: busLoading } = useStudentBus();
   const { tracking, loading } = useLiveTracking(busInfo?.driverUserId);
-  const { notifications, loading: notificationsLoading } = useRoleNotifications("student");
-  const { location: studentLocation, error: studentLocationError } = useStudentLocation({
-    watch: false,
-  });
+  const { notifications } = useRoleNotifications("student");
+  const { location: studentLocation, error: studentLocationError } = useStudentLocation({ watch: false });
 
   const sLat = studentLocation?.latitude;
   const sLng = studentLocation?.longitude;
   const [routeSummary, setRouteSummary] = useState<StudentRouteRecord | null>(null);
-  const [driverStartLocation, setDriverStartLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
+  const [driverStartLocation, setDriverStartLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [activeTripSummary, setActiveTripSummary] = useState<ActiveTripSummary | null>(null);
   const lastFetchRef = useRef<{
-    timestamp: number;
-    driverLat: number;
-    driverLng: number;
-    studentLat: number;
-    studentLng: number;
+    timestamp: number; driverLat: number; driverLng: number;
+    studentLat: number; studentLng: number;
   } | null>(null);
 
   useEffect(() => {
     const session = getSession();
-    if (!session) {
-      navigate("/login", { replace: true });
-      return;
-    }
-    if (session.role !== "student") {
-      navigate(getHomeRouteForRole(session.role), { replace: true });
-    }
+    if (!session) { navigate("/login", { replace: true }); return; }
+    if (session.role !== "student") navigate(getHomeRouteForRole(session.role), { replace: true });
   }, [navigate]);
 
   useEffect(() => {
     const session = getSession();
-    if (!session) return;
-    setStudentName(session.displayName || session.loginId || session.email.split("@")[0] || "Student");
+    if (session) {
+      setStudentName(session.displayName || session.loginId || session.email.split("@")[0] || "Student");
+    }
   }, []);
 
   const isTrackingActive = tracking?.isActive ?? false;
   const isActive = isTrackingActive || Boolean(activeTripSummary);
   const activeBusNumber = activeTripSummary?.busNumber;
   const activeDriverName = activeTripSummary?.driverName;
+  const activeStartedAt = tracking?.startedAt ?? activeTripSummary?.startedAt ?? null;
 
   const routeEtaText = useMemo(() => {
     if (!routeSummary) return null;
-    const eta = Math.max(1, Math.round(routeSummary.etaMinutes));
-    return `${eta} min`;
+    return `${Math.max(1, Math.round(routeSummary.etaMinutes))} min`;
   }, [routeSummary]);
 
-  /* format ISO timestamp to relative string */
   const lastUpdated = tracking?.updatedAt ? formatRelativeTime(tracking.updatedAt) : null;
-  const activeStartedAt = tracking?.startedAt ?? activeTripSummary?.startedAt ?? null;
 
   useEffect(() => {
-    let isMounted = true;
-
-    const syncTripSummary = async () => {
+    let mounted = true;
+    const sync = async () => {
       const next = await getActiveTripSummary();
-      if (!isMounted) return;
-      setActiveTripSummary(next);
+      if (mounted) setActiveTripSummary(next);
     };
-
-    void syncTripSummary();
-    const timer = window.setInterval(() => {
-      void syncTripSummary();
-    }, 5000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(timer);
-    };
+    void sync();
+    const t = window.setInterval(() => void sync(), 5000);
+    return () => { mounted = false; window.clearInterval(t); };
   }, []);
 
   useEffect(() => {
     const driverUserId = tracking?.driverUserId ?? activeTripSummary?.driverUserId;
-
-    if (!isActive || !driverUserId) {
-      setDriverStartLocation(null);
-      return;
-    }
-
-    const activeDriverUserId = driverUserId;
-
-    const key = `pulseride.driverStart.${activeDriverUserId}.${activeStartedAt ?? "active"}`;
-    const cached = window.localStorage.getItem(key);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached) as { lat?: number; lng?: number };
-        if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
-          setDriverStartLocation({ lat: parsed.lat, lng: parsed.lng });
-        }
-      } catch {
-        // Ignore invalid cache and continue with remote lookup.
-      }
-    }
-
-    let isMounted = true;
-
-    const loadStartLocation = async () => {
-      const remoteStart = await getDriverTripStartLocation(activeDriverUserId);
-      if (!isMounted) return;
-
-      const next = remoteStart
-        ? { lat: remoteStart.latitude, lng: remoteStart.longitude }
-        : {
-            lat: tracking?.latitude ?? activeTripSummary?.latitude ?? 0,
-            lng: tracking?.longitude ?? activeTripSummary?.longitude ?? 0,
-          };
-
-      setDriverStartLocation(next);
-      window.localStorage.setItem(key, JSON.stringify(next));
+    if (!isActive || !driverUserId) { setDriverStartLocation(null); return; }
+    let mounted = true;
+    const load = async () => {
+      const remote = await getDriverTripStartLocation(driverUserId);
+      if (!mounted) return;
+      setDriverStartLocation(
+        remote
+          ? { lat: remote.latitude, lng: remote.longitude }
+          : { lat: tracking?.latitude ?? 0, lng: tracking?.longitude ?? 0 },
+      );
     };
-
-    void loadStartLocation();
-
-    return () => {
-      isMounted = false;
-    };
+    void load();
+    return () => { mounted = false; };
   }, [
-    activeTripSummary?.driverUserId,
-    activeTripSummary?.latitude,
-    activeTripSummary?.longitude,
-    tracking?.driverUserId,
-    tracking?.startedAt,
-    tracking?.latitude,
-    tracking?.longitude,
-    isActive,
+    activeTripSummary?.driverUserId, tracking?.driverUserId,
+    tracking?.latitude, tracking?.longitude, isActive,
   ]);
 
   useEffect(() => {
     if (!tracking?.isActive || sLat === undefined || sLng === undefined) {
-      setRouteSummary(null);
-      clearStudentRoute();
-      return;
+      setRouteSummary(null); clearStudentRoute(); return;
     }
-
-    const previous = lastFetchRef.current;
+    const prev = lastFetchRef.current;
     const now = Date.now();
-    const movedDriverMeters = previous
-      ? haversineKm(previous.driverLat, previous.driverLng, tracking.latitude, tracking.longitude) *
-        1000
-      : Number.POSITIVE_INFINITY;
-    const movedStudentMeters = previous
-      ? haversineKm(previous.studentLat, previous.studentLng, sLat!, sLng!) * 1000
-      : Number.POSITIVE_INFINITY;
-    const shouldRefetch =
-      !previous ||
-      now - previous.timestamp > 5000 ||
-      movedDriverMeters > 8 ||
-      movedStudentMeters > 8;
-
-    if (!shouldRefetch) return;
+    const moved = prev
+      ? haversineKm(prev.driverLat, prev.driverLng, tracking.latitude, tracking.longitude) * 1000
+      : Infinity;
+    const movedStudent = prev
+      ? haversineKm(prev.studentLat, prev.studentLng, sLat!, sLng!) * 1000
+      : Infinity;
+    if (prev && now - prev.timestamp < 5000 && moved < 8 && movedStudent < 8) return;
 
     lastFetchRef.current = {
-      timestamp: now,
-      driverLat: tracking.latitude,
-      driverLng: tracking.longitude,
-      studentLat: sLat!,
-      studentLng: sLng!,
+      timestamp: now, driverLat: tracking.latitude, driverLng: tracking.longitude,
+      studentLat: sLat!, studentLng: sLng!,
     };
 
     const controller = new AbortController();
-    let isMounted = true;
+    let mounted = true;
 
-    const saveFallbackRoute = () => {
-      const linearDistanceKm = haversineKm(tracking.latitude, tracking.longitude, sLat!, sLng!);
-      const assumedSpeed = Math.max(tracking.speedKmh, 18);
-      const durationMin = (linearDistanceKm / assumedSpeed) * 60;
-
+    const saveFallback = () => {
+      const d = haversineKm(tracking.latitude, tracking.longitude, sLat!, sLng!);
+      const speed = Math.max(tracking.speedKmh, 18);
+      const dur = (d / speed) * 60;
       const fallback: StudentRouteRecord = {
-        driverLatitude: tracking.latitude,
-        driverLongitude: tracking.longitude,
-        studentLatitude: sLat!,
-        studentLongitude: sLng!,
+        driverLatitude: tracking.latitude, driverLongitude: tracking.longitude,
+        studentLatitude: sLat!, studentLongitude: sLng!,
         driverStartLatitude: driverStartLocation?.lat ?? null,
         driverStartLongitude: driverStartLocation?.lng ?? null,
-        distanceKm: linearDistanceKm,
-        durationMin,
-        etaMinutes: Math.max(1, durationMin),
-        path: [
-          [tracking.latitude, tracking.longitude],
-          [sLat!, sLng!],
-        ],
+        distanceKm: d, durationMin: dur,
+        etaMinutes: Math.max(1, dur),
+        path: [[tracking.latitude, tracking.longitude], [sLat!, sLng!]],
         updatedAt: new Date().toISOString(),
       };
-
-      if (!isMounted) return;
-      setRouteSummary(fallback);
-      saveStudentRoute(fallback);
+      if (mounted) { setRouteSummary(fallback); saveStudentRoute(fallback); }
     };
 
-    const fetchRoute = async () => {
+    const fetch_ = async () => {
       try {
-        const url =
-          `https://router.project-osrm.org/route/v1/driving/` +
-          `${tracking.longitude},${tracking.latitude};${sLng},${sLat}` +
-          `?overview=full&geometries=geojson`;
-
-        const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) {
-          saveFallbackRoute();
-          return;
-        }
-
-        const data = (await response.json()) as {
-          routes?: Array<{
-            distance: number;
-            duration: number;
-            geometry: { coordinates: Array<[number, number]> };
-          }>;
+        const url = `https://router.project-osrm.org/route/v1/driving/` +
+          `${tracking.longitude},${tracking.latitude};${sLng},${sLat}?overview=full&geometries=geojson`;
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) { saveFallback(); return; }
+        const data = await res.json() as {
+          routes?: Array<{ distance: number; duration: number; geometry: { coordinates: Array<[number, number]> } }>;
         };
-
-        const route = data.routes?.[0];
-        if (!route) {
-          saveFallbackRoute();
-          return;
-        }
-
+        const r = data.routes?.[0];
+        if (!r) { saveFallback(); return; }
         const next: StudentRouteRecord = {
-          driverLatitude: tracking.latitude,
-          driverLongitude: tracking.longitude,
-          studentLatitude: sLat!,
-          studentLongitude: sLng!,
+          driverLatitude: tracking.latitude, driverLongitude: tracking.longitude,
+          studentLatitude: sLat!, studentLongitude: sLng!,
           driverStartLatitude: driverStartLocation?.lat ?? null,
           driverStartLongitude: driverStartLocation?.lng ?? null,
-          distanceKm: route.distance / 1000,
-          durationMin: route.duration / 60,
-          etaMinutes: Math.max(1, route.duration / 60),
-          path: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+          distanceKm: r.distance / 1000, durationMin: r.duration / 60,
+          etaMinutes: Math.max(1, r.duration / 60),
+          path: r.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
           updatedAt: new Date().toISOString(),
         };
-
-        if (!isMounted) return;
-        setRouteSummary(next);
-        saveStudentRoute(next);
+        if (mounted) { setRouteSummary(next); saveStudentRoute(next); }
       } catch {
-        if (controller.signal.aborted) return;
-        saveFallbackRoute();
+        if (!controller.signal.aborted) saveFallback();
       }
     };
 
-    void fetchRoute();
-
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
+    void fetch_();
+    return () => { mounted = false; controller.abort(); };
   }, [
-    tracking?.isActive,
-    tracking?.latitude,
-    tracking?.longitude,
-    tracking?.speedKmh,
-    sLat,
-    sLng,
-    driverStartLocation?.lat,
-    driverStartLocation?.lng,
+    tracking?.isActive, tracking?.latitude, tracking?.longitude, tracking?.speedKmh,
+    sLat, sLng, driverStartLocation?.lat, driverStartLocation?.lng,
   ]);
 
   if (busLoading) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-5 sm:py-5">
-        <header className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-card">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Student dashboard</p>
-          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight">Welcome, {studentName}!</h1>
-          <p className="mt-2 text-sm text-muted-foreground animate-pulse">Loading your bus assignment…</p>
-        </header>
+      <div className="flex h-[calc(100vh-64px)] items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
+          <p className="text-sm font-semibold text-muted-foreground">Loading your bus...</p>
+        </div>
       </div>
     );
   }
 
   if (!busInfo) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-5 sm:py-5">
-        <header className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-card">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Student dashboard</p>
-          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight">Welcome, {studentName}!</h1>
-        </header>
-        <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5 shadow-card">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-warning shrink-0" />
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-warning">No Bus Assigned</p>
+      <div className="flex h-[calc(100vh-64px)] items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-3xl border border-warning/30 bg-warning/5 p-8 text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-warning/10">
+            <AlertCircle className="h-8 w-8 text-warning" />
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Your account is approved but admin hasn't assigned you to a bus yet. Please contact admin to get your bus number assigned.
-          </p>
+          <div>
+            <h2 className="font-display text-xl font-bold">No Bus Assigned</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Hi {studentName}! Your account is approved but admin hasn't assigned you to a bus yet.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-card/50 p-3 text-left">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</p>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full status-warning" />
+              <span className="text-sm font-medium">Waiting for assignment</span>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
+  /* ── Main layout: map fills screen, bottom sheet overlay ── */
   return (
-    <div className="h-full lg:h-[calc(100vh-4rem)] overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-5 sm:py-5">
-        {/* ── Header ── */}
-        <header className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-card sm:mb-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Student dashboard
-          </p>
-          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-            Welcome, {studentName}!
-          </h1>
-          <p className="mt-1 text-xs font-medium text-muted-foreground">
-            {busInfo.busNumber} · {busInfo.routeName}
-            {!busInfo.driverUserId && " · No driver assigned yet"}
-          </p>
-        </header>
+    <div className="relative h-[calc(100vh-64px)] overflow-hidden">
+      {/* Full-screen map */}
+      <GlobalChennaiMap className="absolute inset-0 h-full w-full" />
 
-        <div className="space-y-4">
-          {/* ── Bus Status Card ── */}
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Bus Status
-            </p>
-            <div className="mt-3 rounded-xl border border-border bg-surface p-3">
-              <div className="flex items-center gap-3">
-                {isActive ? (
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
-                  </span>
-                ) : (
-                  <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40" />
-                )}
-                <div>
-                  <p className="text-lg font-bold text-foreground">
-                    {isActive ? "Bus is Active" : "No Active Trip"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {isTrackingActive
-                      ? "Driver is sharing live location"
-                      : isActive
-                        ? "Trip has started. Waiting for live coordinates."
-                        : "Waiting for driver to start a trip"}
-                  </p>
-
-                  {isActive && (activeBusNumber || activeDriverName) ? (
-                    <p className="mt-1 text-xs font-medium text-foreground">
-                      {activeBusNumber ? `Bus ${activeBusNumber}` : "Assigned bus active"}
-                      {activeDriverName ? ` · Driver ${activeDriverName}` : ""}
-                    </p>
-                  ) : null}
-
-                  {isActive && studentLocation && routeSummary ? (
-                    <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-                      <p>
-                        Driver start:{" "}
-                        {formatLatLng(
-                          routeSummary.driverStartLatitude ?? tracking?.latitude ?? 0,
-                          routeSummary.driverStartLongitude ?? tracking?.longitude ?? 0,
-                        )}
-                      </p>
-                      <p>
-                        Your location:{" "}
-                        {formatLatLng(studentLocation.latitude, studentLocation.longitude)}
-                      </p>
-                      <p>
-                        Route to you: {routeSummary.distanceKm.toFixed(2)} km · ETA {routeEtaText}
-                      </p>
-                    </div>
-                  ) : isActive && studentLocationError ? (
-                    <p className="mt-2 text-xs text-warning">
-                      Enable location access to get precise route ETA.
-                    </p>
-                  ) : null}
-                </div>
-              </div>
+      {/* Top info bar */}
+      <div className="pointer-events-none absolute left-0 right-0 top-0 z-[500] flex items-center justify-between gap-2 px-3 pt-3">
+        <div className="glass rounded-xl px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Your Bus</p>
+          <p className="font-display text-sm font-bold">{busInfo.busNumber}</p>
+        </div>
+        <div className="glass rounded-xl px-3 py-2 text-center">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Route</p>
+          <p className="text-sm font-bold truncate max-w-[140px]">{busInfo.routeName}</p>
+        </div>
+        {isActive ? (
+          <div className="glass rounded-xl px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</p>
+            <div className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full status-online" />
+              <p className="text-sm font-bold text-success">Live</p>
             </div>
-          </section>
+          </div>
+        ) : (
+          <div className="glass rounded-xl px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</p>
+            <p className="text-sm font-bold text-muted-foreground">Idle</p>
+          </div>
+        )}
+      </div>
 
-          {/* ── Live Stats ── */}
-          {loading ? (
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
-              <div className="flex min-h-20 items-center justify-center">
-                <p className="text-sm text-muted-foreground animate-pulse">Loading live data…</p>
-              </div>
-            </section>
-          ) : isTrackingActive && tracking ? (
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Live Tracking
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <InfoTile
-                  icon={<Gauge className="h-4 w-4" />}
-                  label="Speed"
-                  value={`${tracking.speedKmh.toFixed(0)}`}
-                  suffix="km/h"
-                />
-                <InfoTile
-                  icon={<RouteIcon className="h-4 w-4" />}
-                  label="Distance"
-                  value={tracking.distanceKm.toFixed(2)}
-                  suffix="km"
-                />
-                <InfoTile
-                  icon={<MapPin className="h-4 w-4" />}
-                  label="Latitude"
-                  value={tracking.latitude.toFixed(5)}
-                  suffix="°"
-                />
-                <InfoTile
-                  icon={<MapPin className="h-4 w-4" />}
-                  label="Longitude"
-                  value={tracking.longitude.toFixed(5)}
-                  suffix="°"
-                />
-              </div>
-            </section>
-          ) : isActive ? (
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
-              <div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-success/30 bg-success/10 text-center">
-                <Bus className="h-8 w-8 text-success" />
-                <p className="mt-2 text-base font-semibold text-foreground">Trip has started.</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {activeBusNumber
-                    ? `Bus ${activeBusNumber} is active.`
-                    : "The driver has started the trip."}{" "}
-                  Live GPS stats will appear as soon as tracking syncs.
-                </p>
-              </div>
-            </section>
-          ) : (
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
-              <div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-border bg-surface text-center">
-                <Bus className="h-8 w-8 text-muted-foreground" />
-                <p className="mt-2 text-base text-muted-foreground">No bus is currently active.</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Live stats will appear here when a trip starts.
-                </p>
-              </div>
-            </section>
-          )}
-
-          {/* ── Live Activity ── */}
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Live Activity
-            </p>
-            {isTrackingActive && tracking ? (
-              <div className="mt-3 space-y-2">
-                <ActivityRow
-                  icon={<Radio className="h-3.5 w-3.5 text-success" />}
-                  text={`Bus is moving at ${tracking.speedKmh.toFixed(0)} km/h`}
-                  time={lastUpdated}
-                />
-                <ActivityRow
-                  icon={<RouteIcon className="h-3.5 w-3.5 text-primary" />}
-                  text={`${tracking.distanceKm.toFixed(2)} km covered so far`}
-                  time={lastUpdated}
-                />
-                {activeStartedAt && (
-                  <ActivityRow
-                    icon={<Clock className="h-3.5 w-3.5 text-accent" />}
-                    text={`Trip started at ${new Date(activeStartedAt).toLocaleTimeString()}`}
-                    time=""
-                  />
+      {/* Bottom sheet */}
+      <div
+        className={`absolute bottom-0 left-0 right-0 z-[500] transition-transform duration-300 ${
+          sheetOpen ? "translate-y-0" : "translate-y-[calc(100%-64px)]"
+        }`}
+      >
+        <div className="glass border-t border-border/50 rounded-t-3xl overflow-hidden">
+          {/* Sheet handle + toggle */}
+          <button
+            type="button"
+            onClick={() => setSheetOpen((v) => !v)}
+            className="flex w-full flex-col items-center gap-1 px-4 pb-2 pt-3"
+          >
+            <div className="h-1 w-10 rounded-full bg-border" />
+            <div className="flex w-full items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isActive && (
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+                  </span>
                 )}
+                <span className="font-display text-sm font-bold">
+                  {isActive
+                    ? isTrackingActive
+                      ? `${tracking!.speedKmh.toFixed(0)} km/h · ${routeEtaText ? `ETA ${routeEtaText}` : "On route"}`
+                      : "Trip active"
+                    : "Waiting for trip"}
+                </span>
+              </div>
+              {sheetOpen ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </button>
+
+          {/* Sheet content */}
+          <div className="px-4 pb-6 space-y-3">
+            {/* Live stats */}
+            {isTrackingActive && tracking ? (
+              <div className="grid grid-cols-4 gap-2">
+                <MiniStat icon={<Gauge className="h-3.5 w-3.5" />} label="Speed" value={`${tracking.speedKmh.toFixed(0)}`} unit="km/h" color="accent" />
+                <MiniStat icon={<RouteIcon className="h-3.5 w-3.5" />} label="Dist" value={tracking.distanceKm.toFixed(1)} unit="km" color="primary" />
+                <MiniStat icon={<MapPin className="h-3.5 w-3.5" />} label="ETA" value={routeEtaText ?? "—"} unit="" color="success" />
+                <MiniStat icon={<Clock className="h-3.5 w-3.5" />} label="Updated" value={lastUpdated ?? "—"} unit="" color="muted" />
               </div>
             ) : isActive ? (
-              <div className="mt-3 space-y-2">
-                <ActivityRow
-                  icon={<Radio className="h-3.5 w-3.5 text-success" />}
-                  text={
-                    activeBusNumber
-                      ? `Bus ${activeBusNumber} has started the trip`
-                      : "Driver has started the trip"
-                  }
-                  time={activeStartedAt ? formatRelativeTime(activeStartedAt) : null}
-                />
-                {activeDriverName ? (
-                  <ActivityRow
-                    icon={<Bus className="h-3.5 w-3.5 text-primary" />}
-                    text={`Driver ${activeDriverName} is on the active route`}
-                    time=""
-                  />
-                ) : null}
+              <div className="flex items-center gap-2.5 rounded-xl border border-success/25 bg-success/8 px-3 py-2.5">
+                <Radio className="h-4 w-4 text-success shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-success">Trip Started</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {activeBusNumber ? `Bus ${activeBusNumber}` : "Assigned bus"} is en route.
+                    {activeDriverName ? ` Driver: ${activeDriverName}.` : ""} Live GPS syncing...
+                  </p>
+                </div>
               </div>
             ) : (
-              <p className="mt-3 text-sm text-muted-foreground">0 updates for now.</p>
+              <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-3 py-2.5">
+                <Bus className="h-4 w-4 text-muted-foreground shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  {busInfo.driverUserId
+                    ? "Driver assigned. Waiting for trip to start."
+                    : "No driver assigned to your bus yet."}
+                </p>
+              </div>
             )}
-          </section>
 
-          {/* ── Notifications ── */}
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Notifications
-            </p>
-            {notificationsLoading ? (
-              <p className="mt-3 text-sm text-muted-foreground">Loading notifications...</p>
-            ) : notifications.length > 0 ? (
-              <div className="mt-3 space-y-2.5">
-                {notifications.map((note) => (
-                  <div key={note.id} className="rounded-xl border border-border bg-surface p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-foreground">{note.title}</p>
-                      <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {note.targetRole}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{note.message}</p>
+            {/* Route info when active and location known */}
+            {isTrackingActive && routeSummary && studentLocation ? (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Route to You</p>
+                <div className="flex gap-4 text-xs text-muted-foreground">
+                  <span>{routeSummary.distanceKm.toFixed(2)} km remaining</span>
+                  <span>ETA {routeEtaText}</span>
+                </div>
+              </div>
+            ) : studentLocationError && isActive ? (
+              <p className="text-[10px] text-warning text-center">
+                Enable location for precise ETA.
+              </p>
+            ) : null}
+
+            {/* Notifications */}
+            {notifications.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Notifications
+                </p>
+                {notifications.slice(0, 2).map((note) => (
+                  <div key={note.id} className="rounded-xl border border-border/50 bg-card/60 p-2.5">
+                    <p className="text-xs font-semibold">{note.title}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{note.message}</p>
                   </div>
                 ))}
               </div>
-            ) : isActive ? (
-              <div className="mt-3 flex items-start gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2.5">
-                <Radio className="mt-0.5 h-3.5 w-3.5 text-success shrink-0" />
-                <p className="text-xs font-medium text-success">
-                  {isTrackingActive
-                    ? "Driver is actively sharing their live location."
-                    : "Trip is active. Live location is syncing."}
-                </p>
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-muted-foreground">0 unread notifications.</p>
             )}
-          </section>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function formatLatLng(lat: number, lng: number): string {
-  return `${lat.toFixed(5)}°, ${lng.toFixed(5)}°`;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Info tile for live stats                                          */
-/* ------------------------------------------------------------------ */
-function InfoTile({
-  icon,
-  label,
-  value,
-  suffix,
+function MiniStat({
+  icon, label, value, unit, color,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  suffix: string;
+  icon: React.ReactNode; label: string; value: string; unit: string;
+  color: "accent" | "primary" | "success" | "muted";
 }) {
+  const colorMap = {
+    accent:  "text-accent",
+    primary: "text-primary",
+    success: "text-success",
+    muted:   "text-muted-foreground",
+  };
   return (
-    <div className="rounded-xl border border-border bg-surface p-3">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        {icon}
-        <span className="text-[10px] font-semibold uppercase tracking-wider">{label}</span>
-      </div>
-      <div className="mt-1 flex items-baseline gap-0.5">
-        <span className="font-display text-lg font-bold tabular-nums">{value}</span>
-        <span className="text-xs font-medium text-muted-foreground">{suffix}</span>
-      </div>
+    <div className="rounded-xl border border-border/50 bg-card/60 p-2.5 text-center">
+      <div className={`flex justify-center ${colorMap[color]}`}>{icon}</div>
+      <p className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="font-display text-sm font-bold leading-none mt-0.5 tabular-nums">{value}</p>
+      {unit && <p className="text-[9px] text-muted-foreground">{unit}</p>}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Activity row                                                      */
-/* ------------------------------------------------------------------ */
-function ActivityRow({
-  icon,
-  text,
-  time,
-}: {
-  icon: React.ReactNode;
-  text: string;
-  time: string | null;
-}) {
-  return (
-    <div className="flex items-center gap-2.5 rounded-xl bg-surface px-3 py-2">
-      {icon}
-      <span className="flex-1 text-xs font-medium text-foreground">{text}</span>
-      {time && (
-        <span className="text-[10px] font-medium text-muted-foreground shrink-0">{time}</span>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Relative time helper                                              */
-/* ------------------------------------------------------------------ */
 function formatRelativeTime(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 5) return "just now";
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 5) return "now";
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  return `${Math.floor(diff / 3600)}h`;
 }
