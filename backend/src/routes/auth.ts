@@ -55,7 +55,9 @@ router.post("/login", async (req, res) => {
   res.json({ ok: true, approved: false });
 });
 
-// POST /api/signup — creates a pending registration and auto-confirms the Supabase email
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// POST /api/signup — creates a pending registration (email confirmation is handled by Supabase)
 router.post("/signup", async (req, res) => {
   const { name, email, role, userId } = req.body as {
     name?: string;
@@ -69,13 +71,14 @@ router.post("/signup", async (req, res) => {
     return;
   }
 
-  // Auto-confirm the Supabase auth email so the user can sign in without clicking a link
-  const { error: confirmError } = await db.auth.admin.updateUserById(userId, {
-    email_confirm: true,
-  });
-  if (confirmError) {
-    console.error("email auto-confirm error:", confirmError.message);
+  // userId must be a real Supabase auth UUID — reject local-only fallback IDs
+  if (!UUID_RE.test(userId)) {
+    res.status(400).json({ ok: false, error: "Invalid userId — Supabase signup may have failed silently" });
+    return;
   }
+
+  // NOTE: we intentionally do NOT call updateUserById({ email_confirm: true }) here.
+  // Email confirmation is handled by Supabase's own verification email flow.
 
   const { data: reg, error: regError } = await db
     .from("registrations")

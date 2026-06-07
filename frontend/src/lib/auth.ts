@@ -335,7 +335,6 @@ export async function signUpUser(input: SignUpInput): Promise<RegisteredUser> {
   }
 
   const nowIso = new Date().toISOString();
-  const userId = `local-user-${crypto.randomUUID()}`;
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: loginId,
@@ -352,7 +351,12 @@ export async function signUpUser(input: SignUpInput): Promise<RegisteredUser> {
     throw new Error(authError.message);
   }
 
-  const remoteUserId = authData.user?.id ?? userId;
+  const remoteUserId = authData.user?.id;
+  if (!remoteUserId) {
+    // Supabase returns user:null (no error) when the email is already registered
+    // and confirmed — it hides the existence of the account to prevent enumeration.
+    throw new Error("This email is already registered. Please sign in instead.");
+  }
 
   // Write registration + approval through the server API (uses service-role key,
   // bypassing RLS which would block an unauthenticated anon call).
