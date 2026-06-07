@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Loader2, Bus, ArrowRight, Mail } from "lucide-react";
@@ -11,66 +11,76 @@ export function AuthConfirmPage() {
   const { search } = useLocation();
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState("");
-  const ran = useRef(false);
+  // Prevents double-settling if both onAuthStateChange and getSession fire
+  const settledRef = useRef(false);
 
+  const succeed = useCallback(async () => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    try { await supabase.auth.signOut(); } catch { /* ignore */ }
+    setStatus("success");
+    window.setTimeout(() => navigate("/login", { replace: true }), 4000);
+  }, [navigate]);
+
+  const fail = useCallback((msg: string) => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    setErrorMsg(msg);
+    setStatus("error");
+  }, []);
+
+  // Listen for Supabase processing the URL token (PKCE ?code= or implicit #access_token=).
+  // detectSessionInUrl: true means the SDK fires SIGNED_IN automatically after exchange.
   useEffect(() => {
-    // Guard against StrictMode double-invoke
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) void succeed();
+    });
+    return () => subscription.unsubscribe();
+  }, [succeed]);
+
+  // One-time effect: validate URL and handle token_hash flow (OTP, no PKCE needed).
+  // Also fires an immediate getSession check as a fallback race-condition guard.
+  const ran = useRef(false);
+  useEffect(() => {
     if (ran.current) return;
     ran.current = true;
 
-    const run = async () => {
-      try {
-        const params = new URLSearchParams(search);
-        const tokenHash = params.get("token_hash");
-        const code = params.get("code");
+    const params = new URLSearchParams(search);
+    const tokenHash = params.get("token_hash");
+    const code = params.get("code");
+    const hashToken = new URLSearchParams(window.location.hash.slice(1)).get("access_token");
 
-        if (tokenHash) {
-          // Custom email template path: ?token_hash=...&type=email (or type=signup)
-          const { error } = await supabase.auth.verifyOtp({
-            token_hash: tokenHash,
-            type: "email",
-          });
-          if (error) throw error;
-        } else if (code) {
-          // PKCE flow path: ?code=...  (default for newer Supabase projects)
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
-        } else {
-          // Legacy implicit flow: access_token in URL fragment (#access_token=...&refresh_token=...)
-          // detectSessionInUrl is disabled globally so we parse the hash manually.
-          const hashParams = new URLSearchParams(window.location.hash.slice(1));
-          const accessToken = hashParams.get("access_token");
-          const refreshToken = hashParams.get("refresh_token");
-          if (accessToken && refreshToken) {
-            const { error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            if (error) throw error;
-          } else {
-            throw new Error("No verification token found in the link. It may have expired.");
-          }
-        }
+    if (!tokenHash && !code && !hashToken) {
+      fail("No verification token found in this link. It may have expired.");
+      return;
+    }
 
-        // Email is now verified in Supabase. Sign out of the Supabase session because
-        // our app uses its own session system and admin approval is still required.
-        await supabase.auth.signOut();
+    if (tokenHash) {
+      // OTP / token-hash path — no PKCE code verifier needed, works cross-device.
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type: "email" })
+        .then(({ error }) => error ? fail(error.message) : void succeed())
+        .catch((err) => fail(err instanceof Error ? err.message : "Verification failed."));
+      return;
+    }
 
-        setStatus("success");
-        // Auto-redirect to login after 4 seconds
-        window.setTimeout(() => navigate("/login", { replace: true }), 4000);
-      } catch (err) {
-        setErrorMsg(
-          err instanceof Error
-            ? err.message
-            : "Verification failed. The link may have expired.",
-        );
-        setStatus("error");
-      }
-    };
+    // PKCE code or implicit hash path — Supabase processes automatically via
+    // detectSessionInUrl: true. Check immediately in case it already resolved
+    // before our onAuthStateChange listener was registered.
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) void succeed();
+    });
 
-    void run();
-  }, [navigate, search]);
+    // Timeout: if Supabase never fires SIGNED_IN after 14 s, show a helpful error.
+    const timeoutId = window.setTimeout(() => {
+      fail(
+        code
+          ? "Verification failed. If you opened this link on a different device or browser than where you signed up, please reopen it in the original browser (PKCE requirement)."
+          : "Verification timed out. The link may have expired — please request a new one.",
+      );
+    }, 14000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [search, succeed, fail]);
 
   return (
     <div className="relative flex min-h-[calc(100vh-64px)] items-center justify-center p-6 overflow-hidden">

@@ -189,18 +189,17 @@ export function getSession(): AuthSession | null {
 }
 
 /**
- * Call once on app boot. If no valid custom session exists, wipes any residual
- * Supabase auth state so the SDK can't silently restore a previous login.
+ * Call once on app boot. If no valid custom session exists, signs out of Supabase
+ * so no residual in-memory session can bypass our login gate.
+ *
+ * We do NOT wipe localStorage keys here because Supabase writes a PKCE code
+ * verifier during signup that must survive until the user clicks the email link.
+ * Deleting it would break email verification.
  */
 export async function initAuth(): Promise<void> {
   if (!isBrowser()) return;
   const session = getSession();
   if (!session) {
-    // Purge all Supabase-related keys from localStorage so nothing leaks
-    const keysToRemove = Object.keys(window.localStorage).filter(
-      (k) => k.startsWith("sb-") || k.includes("supabase"),
-    );
-    keysToRemove.forEach((k) => window.localStorage.removeItem(k));
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
   }
 }

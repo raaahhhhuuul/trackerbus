@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  AlertCircle, Bus, ChevronDown, ChevronUp, Clock, Gauge,
-  MapPin, Radio, Route as RouteIcon,
+  AlertCircle, Bus, Check, ChevronDown, ChevronUp, Clock, Gauge,
+  MapPin, Radio, RefreshCcw, Route as RouteIcon, Search, X,
 } from "lucide-react";
 import { getHomeRouteForRole, getSession } from "@/lib/auth";
 import { GlobalChennaiMap } from "@/components/global-chennai-map";
+import { getBuses, type AdminBus } from "@/lib/admin-console";
 import { useLiveTracking } from "../hooks/use-live-tracking";
 import { useRoleNotifications } from "../hooks/use-role-notifications";
 import { useStudentLocation } from "../hooks/use-student-location";
@@ -18,8 +19,33 @@ export function StudentDashboard() {
   const navigate = useNavigate();
   const [studentName, setStudentName] = useState("Student");
   const [sheetOpen, setSheetOpen] = useState(true);
+
+  // Bus-browser state — all ephemeral (resets on re-login / page refresh)
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const [allBuses, setAllBuses] = useState<AdminBus[]>([]);
+  const [busesLoading, setBusesLoading] = useState(false);
+  const [routeFilter, setRouteFilter] = useState("All");
+  const [busSearch, setBusSearch] = useState("");
+  const [overrideBusId, setOverrideBusId] = useState<string | null>(null);
+
   const { busInfo, loading: busLoading } = useStudentBus();
-  const { tracking, loading } = useLiveTracking(busInfo?.driverUserId);
+
+  // The "effective" bus: either the student's own or a temporary override
+  const effectiveBusInfo = useMemo(() => {
+    if (!overrideBusId) return busInfo;
+    const found = allBuses.find((b) => b.id === overrideBusId);
+    if (!found) return busInfo;
+    return {
+      busId: found.id,
+      busNumber: found.busNumber,
+      routeName: found.routeName,
+      driverUserId: found.assignedDriverId,
+    };
+  }, [overrideBusId, allBuses, busInfo]);
+
+  const isOnOverride = Boolean(overrideBusId && overrideBusId !== busInfo?.busId);
+
+  const { tracking, loading } = useLiveTracking(effectiveBusInfo?.driverUserId);
   const { notifications } = useRoleNotifications("student");
   const { location: studentLocation, error: studentLocationError } = useStudentLocation({ watch: false });
 
@@ -44,6 +70,17 @@ export function StudentDashboard() {
     if (session) {
       setStudentName(session.displayName || session.loginId || session.email.split("@")[0] || "Student");
     }
+  }, []);
+
+  // Load all buses once for the browser panel
+  useEffect(() => {
+    let mounted = true;
+    setBusesLoading(true);
+    getBuses()
+      .then((buses) => { if (mounted) setAllBuses(buses); })
+      .catch(() => {})
+      .finally(() => { if (mounted) setBusesLoading(false); });
+    return () => { mounted = false; };
   }, []);
 
   const isTrackingActive = tracking?.isActive ?? false;
@@ -199,21 +236,46 @@ export function StudentDashboard() {
     );
   }
 
+  // Derived data for the browser panel
+  const uniqueRoutes = useMemo(
+    () => Array.from(new Set(allBuses.map((b) => b.routeName))).sort(),
+    [allBuses],
+  );
+  const filteredBuses = useMemo(() => {
+    let list = allBuses;
+    if (routeFilter !== "All") list = list.filter((b) => b.routeName === routeFilter);
+    if (busSearch.trim()) {
+      const q = busSearch.trim().toLowerCase();
+      list = list.filter(
+        (b) => b.busNumber.toLowerCase().includes(q) || b.routeName.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [allBuses, routeFilter, busSearch]);
+
   /* ── Main layout: map fills screen, bottom sheet overlay ── */
   return (
     <div className="relative h-[calc(100vh-64px)] overflow-hidden">
-      {/* Full-screen map — no className so Leaflet measures h-full w-full correctly */}
-      <GlobalChennaiMap />
+      {/* Full-screen map — pass override so map tracks the selected bus's driver */}
+      <GlobalChennaiMap
+        driverUserIdOverride={isOnOverride ? (effectiveBusInfo?.driverUserId ?? null) : undefined}
+      />
 
-      {/* Top info bar — absolute overlay, z above the map */}
+      {/* Top info bar */}
       <div className="pointer-events-none absolute left-0 right-0 top-0 z-[500] flex items-center justify-between gap-2 px-3 pt-3">
-        <div className="glass rounded-xl px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Your Bus</p>
-          <p className="font-display text-sm font-bold">{busInfo.busNumber}</p>
+        <div className={`glass rounded-xl px-3 py-2 ${isOnOverride ? "ring-1 ring-accent/50" : ""}`}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {isOnOverride ? "Viewing" : "Your Bus"}
+          </p>
+          <p className={`font-display text-sm font-bold font-mono ${isOnOverride ? "text-accent" : ""}`}>
+            {effectiveBusInfo?.busNumber ?? busInfo.busNumber}
+          </p>
         </div>
         <div className="glass rounded-xl px-3 py-2 text-center">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Route</p>
-          <p className="text-sm font-bold truncate max-w-[140px]">{busInfo.routeName}</p>
+          <p className="text-sm font-bold truncate max-w-[130px]">
+            {effectiveBusInfo?.routeName ?? busInfo.routeName}
+          </p>
         </div>
         {isActive ? (
           <div className="glass rounded-xl px-3 py-2">
@@ -229,12 +291,208 @@ export function StudentDashboard() {
             <p className="text-sm font-bold text-muted-foreground">Idle</p>
           </div>
         )}
+        {/* Browse bus button */}
+        <button
+          type="button"
+          onClick={() => { setBrowserOpen(true); setSheetOpen(false); }}
+          className="pointer-events-auto glass rounded-xl px-3 py-2 transition-all hover:ring-1 hover:ring-primary/40 active:scale-95"
+          title="Browse all buses"
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Switch</p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <Bus className="h-3.5 w-3.5 text-primary" />
+            <RefreshCcw className="h-3 w-3 text-muted-foreground" />
+          </div>
+        </button>
       </div>
 
+      {/* Override banner — shown when viewing a non-default bus */}
+      {isOnOverride && (
+        <div className="pointer-events-auto absolute left-3 right-3 top-[70px] z-[500] flex items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent" />
+            <p className="text-xs font-semibold text-accent truncate">
+              Temporary view · {effectiveBusInfo?.busNumber} · {effectiveBusInfo?.routeName}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOverrideBusId(null)}
+            className="flex-shrink-0 flex items-center gap-1 text-[10px] font-bold text-accent hover:text-foreground transition-colors"
+          >
+            <RefreshCcw className="h-3 w-3" />
+            Reset
+          </button>
+        </div>
+      )}
+
+      {/* ─── Bus Browser Panel ─────────────────────────────────── */}
+
+      {/* Backdrop — dims the map when browser is open */}
+      {browserOpen && (
+        <div
+          className="absolute inset-0 z-[590] bg-black/60"
+          onClick={() => setBrowserOpen(false)}
+        />
+      )}
+
+      {/* Slide-up panel */}
+      <div
+        className={`absolute bottom-0 left-0 right-0 z-[600] transition-transform duration-300 ease-in-out ${
+          browserOpen ? "translate-y-0" : "translate-y-full"
+        }`}
+        style={{ height: "82vh" }}
+      >
+        <div className="glass flex h-full flex-col rounded-t-3xl border-t border-border/50 overflow-hidden">
+          {/* Drag handle */}
+          <div className="flex flex-shrink-0 justify-center pb-2 pt-3">
+            <div className="h-1 w-10 rounded-full bg-border" />
+          </div>
+
+          {/* Header */}
+          <div className="flex flex-shrink-0 items-start justify-between px-4 pb-3">
+            <div>
+              <h3 className="font-display text-base font-bold">All Buses</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {busesLoading ? "Loading…" : `${allBuses.length} buses · tap to switch`}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {isOnOverride && (
+                <button
+                  type="button"
+                  onClick={() => { setOverrideBusId(null); setBrowserOpen(false); }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
+                >
+                  <RefreshCcw className="h-3 w-3" />
+                  Back to my bus
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setBrowserOpen(false)}
+                className="rounded-xl p-1.5 text-muted-foreground transition-colors hover:bg-surface/60 hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div className="flex-shrink-0 px-4 pb-3">
+            <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-surface/60 px-3 py-2.5">
+              <Search className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+              <input
+                type="text"
+                value={busSearch}
+                onChange={(e) => setBusSearch(e.target.value)}
+                placeholder="Search bus or route…"
+                className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+              />
+              {busSearch && (
+                <button type="button" onClick={() => setBusSearch("")}>
+                  <X className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Route filter tabs */}
+          <div className="flex-shrink-0 px-4 pb-3">
+            <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              {["All", ...uniqueRoutes].map((route) => (
+                <button
+                  key={route}
+                  type="button"
+                  onClick={() => setRouteFilter(route)}
+                  className={`flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                    routeFilter === route
+                      ? "bg-primary text-white shadow-glow"
+                      : "bg-surface/60 text-muted-foreground hover:bg-surface"
+                  }`}
+                >
+                  {route === "All" ? "All Routes" : route}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bus list */}
+          <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2">
+            {busesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : filteredBuses.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No buses match your search.
+              </div>
+            ) : (
+              filteredBuses.map((bus) => {
+                const isOwnBus = bus.id === busInfo?.busId;
+                const isCurrentlyViewing =
+                  (overrideBusId === bus.id) || (!overrideBusId && isOwnBus);
+                return (
+                  <button
+                    key={bus.id}
+                    type="button"
+                    onClick={() => {
+                      setOverrideBusId(isOwnBus ? null : bus.id);
+                      setBrowserOpen(false);
+                      setSheetOpen(true);
+                    }}
+                    className={`w-full rounded-2xl border px-4 py-3 text-left transition-all active:scale-[0.98] ${
+                      isCurrentlyViewing
+                        ? "border-primary/50 bg-primary/10"
+                        : "border-border/50 bg-card/60 hover:border-primary/25 hover:bg-primary/5"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-sm font-bold">{bus.busNumber}</span>
+                          {isOwnBus && (
+                            <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-400">
+                              My Bus
+                            </span>
+                          )}
+                          {isCurrentlyViewing && !isOwnBus && (
+                            <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
+                              Viewing
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {bus.routeName}
+                        </p>
+                      </div>
+                      <div className="flex flex-shrink-0 items-center gap-2">
+                        {bus.assignedDriverId ? (
+                          <span className="flex items-center gap-1 text-[11px] font-semibold text-success">
+                            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                            Driver
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">No driver</span>
+                        )}
+                        {isCurrentlyViewing && (
+                          <Check className="h-4 w-4 flex-shrink-0 text-primary" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Bottom sheet ──────────────────────────────────────── */}
       {/* Bottom sheet */}
       <div
         className={`absolute bottom-0 left-0 right-0 z-[500] transition-transform duration-300 ${
-          sheetOpen ? "translate-y-0" : "translate-y-[calc(100%-64px)]"
+          sheetOpen && !browserOpen ? "translate-y-0" : "translate-y-[calc(100%-64px)]"
         }`}
       >
         <div className="glass border-t border-border/50 rounded-t-3xl overflow-hidden">

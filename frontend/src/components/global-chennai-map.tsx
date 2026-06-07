@@ -12,14 +12,24 @@ type LeafletModule = typeof import("leaflet");
 const CHENNAI_CENTER: [number, number] = [13.0827, 80.2707];
 const BUS_MARKER: [number, number] = [13.0674, 80.2376];
 
-export function GlobalChennaiMap({ className }: { className?: string }) {
+export function GlobalChennaiMap({
+  className,
+  driverUserIdOverride,
+}: {
+  className?: string;
+  /** When set, tracks this driver instead of the student's default assigned driver. */
+  driverUserIdOverride?: string | null;
+}) {
   const [leafletReady, setLeafletReady] = useState(false);
   const [reactLeaflet, setReactLeaflet] = useState<ReactLeafletModule | null>(null);
   const [leafletModule, setLeafletModule] = useState<LeafletModule | null>(null);
   const session = getSession();
   const isStudentView = session?.role === "student";
   const { busInfo } = useStudentBus();
-  const driverUserIdForMap = isStudentView ? (busInfo?.driverUserId ?? null) : undefined;
+  // driverUserIdOverride takes priority when explicitly passed (even as null)
+  const driverUserIdForMap = isStudentView
+    ? (driverUserIdOverride !== undefined ? driverUserIdOverride : (busInfo?.driverUserId ?? null))
+    : undefined;
   const { tracking } = useLiveTracking(driverUserIdForMap);
   const { location: studentLocation } = useStudentLocation({
     enabled: isStudentView,
