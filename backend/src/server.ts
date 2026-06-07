@@ -5,7 +5,7 @@ import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.js";
 import busRoutes from "./routes/buses.js";
-const PORT = parseInt(process.env.PORT ?? "3001", 10);
+const PORT = Number(process.env.PORT) || 3001;
 const isProd = process.env.NODE_ENV === "production";
 
 if (!process.env.SUPABASE_URL) {
