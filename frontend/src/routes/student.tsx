@@ -200,6 +200,23 @@ export function StudentDashboard() {
     sLat, sLng, driverStartLocation?.lat, driverStartLocation?.lng,
   ]);
 
+  // These memos must stay above all early returns to satisfy the Rules of Hooks.
+  const uniqueRoutes = useMemo(
+    () => Array.from(new Set(allBuses.map((b) => b.routeName))).sort(),
+    [allBuses],
+  );
+  const filteredBuses = useMemo(() => {
+    let list = allBuses;
+    if (routeFilter !== "All") list = list.filter((b) => b.routeName === routeFilter);
+    if (busSearch.trim()) {
+      const q = busSearch.trim().toLowerCase();
+      list = list.filter(
+        (b) => b.busNumber.toLowerCase().includes(q) || b.routeName.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [allBuses, routeFilter, busSearch]);
+
   if (busLoading) {
     return (
       <div className="flex h-[calc(100vh-64px)] items-center justify-center">
@@ -235,23 +252,6 @@ export function StudentDashboard() {
       </div>
     );
   }
-
-  // Derived data for the browser panel
-  const uniqueRoutes = useMemo(
-    () => Array.from(new Set(allBuses.map((b) => b.routeName))).sort(),
-    [allBuses],
-  );
-  const filteredBuses = useMemo(() => {
-    let list = allBuses;
-    if (routeFilter !== "All") list = list.filter((b) => b.routeName === routeFilter);
-    if (busSearch.trim()) {
-      const q = busSearch.trim().toLowerCase();
-      list = list.filter(
-        (b) => b.busNumber.toLowerCase().includes(q) || b.routeName.toLowerCase().includes(q),
-      );
-    }
-    return list;
-  }, [allBuses, routeFilter, busSearch]);
 
   /* ── Main layout: map fills screen, bottom sheet overlay ── */
   return (
