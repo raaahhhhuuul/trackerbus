@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: transporter-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

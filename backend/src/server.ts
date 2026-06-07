@@ -3,12 +3,8 @@ config();
 
 import express from "express";
 import cors from "cors";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
 import authRoutes from "./routes/auth.js";
 import busRoutes from "./routes/buses.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const isProd = process.env.NODE_ENV === "production";
 
@@ -23,21 +19,16 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
 
 const app = express();
 
-app.use(cors({ origin: isProd ? false : "http://localhost:5173", credentials: true }));
+const allowedOrigins = isProd
+  ? (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : "*")
+  : "http://localhost:5173";
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 app.use("/api", authRoutes);
 app.use("/api", busRoutes);
 
 app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
-
-if (isProd) {
-  const distPath = join(__dirname, "../../frontend/dist");
-  app.use(express.static(distPath));
-  app.get("*", (_req, res) => {
-    res.sendFile(join(distPath, "index.html"));
-  });
-}
 
 app.listen(PORT, () => {
   console.log(`\n🚌  Backend running → http://localhost:${PORT}`);
