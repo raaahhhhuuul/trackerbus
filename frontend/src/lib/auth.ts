@@ -152,6 +152,9 @@ export function getHomeRouteForRole(role: UserRole): "/student" | "/driver" | "/
   return roleHomePath[role];
 }
 
+/** Sessions expire after 24 hours of inactivity to prevent stale auto-logins. */
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
 export function getSession(): AuthSession | null {
   if (!isBrowser()) return null;
 
@@ -164,6 +167,13 @@ export function getSession(): AuthSession | null {
     if (typeof parsed.email !== "string" || parsed.email.trim().length === 0) return null;
     if (typeof parsed.loggedInAt !== "string") return null;
 
+    // Expire sessions older than 24 hours
+    const age = Date.now() - new Date(parsed.loggedInAt).getTime();
+    if (age > SESSION_EXPIRY_MS) {
+      window.localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+
     return {
       role: parsed.role,
       email: parsed.email,
@@ -175,6 +185,23 @@ export function getSession(): AuthSession | null {
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Call once on app boot. If no valid custom session exists, wipes any residual
+ * Supabase auth state so the SDK can't silently restore a previous login.
+ */
+export async function initAuth(): Promise<void> {
+  if (!isBrowser()) return;
+  const session = getSession();
+  if (!session) {
+    // Purge all Supabase-related keys from localStorage so nothing leaks
+    const keysToRemove = Object.keys(window.localStorage).filter(
+      (k) => k.startsWith("sb-") || k.includes("supabase"),
+    );
+    keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+    try { await supabase.auth.signOut(); } catch { /* ignore */ }
   }
 }
 

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Navbar } from "@/components/navbar";
 import { AppToaster } from "@/components/app-toaster";
@@ -9,6 +10,7 @@ import { AuthConfirmPage } from "@/routes/auth-confirm";
 import { StudentDashboard } from "@/routes/student";
 import { DriverPanel } from "@/routes/driver";
 import { AdminDashboard } from "@/routes/admin";
+import { initAuth } from "@/lib/auth";
 
 function NotFound() {
   return (
@@ -23,6 +25,10 @@ function NotFound() {
 }
 
 export default function App() {
+  // On every cold boot, purge any residual Supabase session when there is no
+  // valid custom session — prevents stale auth state from auto-logging in users.
+  useEffect(() => { void initAuth(); }, []);
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />

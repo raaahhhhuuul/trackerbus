@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getHomeRouteForRole, getSession } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
 import { saveDriverTracking, stopDriverTracking } from "../lib/live-tracking";
 import { useRoleNotifications } from "../hooks/use-role-notifications";
 import { getAssignedBusForDriver } from "../lib/admin-console";
@@ -65,8 +64,7 @@ export function DriverPanel() {
     const load = async () => {
       try {
         const local = getSession();
-        const { data: { session: supaSession } } = await supabase.auth.getSession();
-        const userId = supaSession?.user.id ?? local?.userId;
+        const userId = local?.userId;
         if (!userId) { if (mounted) { setAssignedBus(null); setAssignmentLoading(false); } return; }
         const bus = await getAssignedBusForDriver(userId);
         if (!mounted) return;

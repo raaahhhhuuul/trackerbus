@@ -36,9 +36,18 @@ export function AuthConfirmPage() {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
         } else {
-          // Implicit / hash flow: access_token is in URL fragment, Supabase reads it
-          const { data } = await supabase.auth.getSession();
-          if (!data.session) {
+          // Legacy implicit flow: access_token in URL fragment (#access_token=...&refresh_token=...)
+          // detectSessionInUrl is disabled globally so we parse the hash manually.
+          const hashParams = new URLSearchParams(window.location.hash.slice(1));
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+          if (accessToken && refreshToken) {
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (error) throw error;
+          } else {
             throw new Error("No verification token found in the link. It may have expired.");
           }
         }
