@@ -125,6 +125,7 @@ export function AdminFleetMap({
     });
   }, [L]);
 
+  /* Always include explicit h-full so Leaflet container has measured pixel height */
   const wrapperClass = className ?? "h-full w-full";
 
   if (!leafletReady || !rl || !L || !busMarkerIcon || !adminMarkerIcon) {
@@ -140,14 +141,24 @@ export function AdminFleetMap({
     );
   }
 
-  const { MapContainer, Marker, TileLayer, ZoomControl, Popup } = rl;
+  const { MapContainer, Marker, TileLayer, ZoomControl, Popup, useMap } = rl;
+
+  /* Fixes "tiles doubled" bug — forces Leaflet to recalculate container size after mount */
+  function MapSizeGuard() {
+    const map = useMap();
+    useEffect(() => {
+      const t = window.setTimeout(() => map.invalidateSize(), 80);
+      return () => window.clearTimeout(t);
+    }, [map]);
+    return null;
+  }
 
   const activeBusCount = buses.filter(
     (b) => b.assignedDriverId && driverPositions[b.assignedDriverId]?.isActive,
   ).length;
 
   return (
-    <div className={`${wrapperClass} relative`}>
+    <div className="relative h-full w-full">
       <MapContainer
         center={CHENNAI_CENTER}
         zoom={11}
@@ -159,6 +170,7 @@ export function AdminFleetMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; CARTO'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
+        <MapSizeGuard />
         <ZoomControl position="bottomright" />
 
         {/* All bus markers */}

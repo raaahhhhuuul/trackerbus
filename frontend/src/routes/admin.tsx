@@ -257,7 +257,7 @@ export function AdminDashboard() {
 
   /* ── Render ─────────────────────────────────────── */
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background">
+    <div className="relative flex h-[calc(100vh-64px)] overflow-hidden bg-background">
       {/* Sidebar */}
       <aside
         className={`relative flex flex-col border-r border-border/50 bg-surface/80 backdrop-blur-xl transition-all duration-300 ${
@@ -385,15 +385,15 @@ export function AdminDashboard() {
       {/* Collapse toggle */}
       <button
         onClick={() => setSidebarOpen((v) => !v)}
-        className="absolute left-0 top-1/2 z-[600] -translate-y-1/2 translate-x-0 flex h-8 w-5 items-center justify-center rounded-r-lg bg-card border border-l-0 border-border/60 text-muted-foreground hover:text-foreground transition-all"
+        className="absolute top-1/2 z-[600] flex h-8 w-5 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-border/60 bg-card text-muted-foreground transition-all hover:text-foreground"
         style={{ left: sidebarOpen ? "320px" : "0px" }}
         title={sidebarOpen ? "Collapse" : "Expand"}
       >
         {sidebarOpen ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
       </button>
 
-      {/* Map area */}
-      <div className="relative flex-1 overflow-hidden">
+      {/* Map area — explicit h so Leaflet measures correctly */}
+      <div className="relative flex-1 h-[calc(100vh-64px)] overflow-hidden">
         <AdminFleetMap
           buses={buses}
           driverPositions={driverPositions}

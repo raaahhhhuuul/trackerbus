@@ -202,10 +202,10 @@ export function StudentDashboard() {
   /* ── Main layout: map fills screen, bottom sheet overlay ── */
   return (
     <div className="relative h-[calc(100vh-64px)] overflow-hidden">
-      {/* Full-screen map */}
-      <GlobalChennaiMap className="absolute inset-0 h-full w-full" />
+      {/* Full-screen map — no className so Leaflet measures h-full w-full correctly */}
+      <GlobalChennaiMap />
 
-      {/* Top info bar */}
+      {/* Top info bar — absolute overlay, z above the map */}
       <div className="pointer-events-none absolute left-0 right-0 top-0 z-[500] flex items-center justify-between gap-2 px-3 pt-3">
         <div className="glass rounded-xl px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Your Bus</p>

@@ -29,38 +29,30 @@ export function GlobalChennaiMap({ className }: { className?: string }) {
 
   useEffect(() => {
     let isMounted = true;
-
-    const setupMap = async () => {
+    const setup = async () => {
       if (typeof window === "undefined") return;
-
       const [leaflet, rl] = await Promise.all([import("leaflet"), import("react-leaflet")]);
-
-      // Fix default marker assets in bundlers.
       delete (leaflet.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
       leaflet.Icon.Default.mergeOptions({
-        iconRetinaUrl: new URL(
-          "leaflet/dist/images/marker-icon-2x.png",
-          import.meta.url,
-        ).toString(),
+        iconRetinaUrl: new URL("leaflet/dist/images/marker-icon-2x.png", import.meta.url).toString(),
         iconUrl: new URL("leaflet/dist/images/marker-icon.png", import.meta.url).toString(),
         shadowUrl: new URL("leaflet/dist/images/marker-shadow.png", import.meta.url).toString(),
       });
-
       if (!isMounted) return;
       setLeafletModule(leaflet);
       setReactLeaflet(rl);
       setLeafletReady(true);
     };
-
-    void setupMap();
-
-    return () => {
-      isMounted = false;
-    };
+    void setup();
+    return () => { isMounted = false; };
   }, []);
 
-  const mapContainerClasses = useMemo(
-    () => className ?? "h-full w-full overflow-hidden rounded-none bg-card",
+  /* Always include `relative` so the label overlay positions correctly.
+     The passed className overrides the layout but we always prepend relative. */
+  const outerClass = useMemo(
+    () => className
+      ? `relative ${className}`
+      : "relative h-full w-full overflow-hidden rounded-none",
     [className],
   );
 
@@ -69,17 +61,16 @@ export function GlobalChennaiMap({ className }: { className?: string }) {
     return leafletModule.divIcon({
       className: "",
       html:
-        "<div style='position:relative;width:36px;height:44px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 7px 12px rgba(2,6,23,.45));'>" +
-        "<div style='position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:10px solid #f97316;'></div>" +
-        "<svg width='30' height='30' viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg' style='position:absolute;top:2px;left:50%;transform:translateX(-50%);'>" +
-        "<rect x='8' y='8' width='48' height='38' rx='10' fill='#f97316' stroke='#7c2d12' stroke-width='3'/>" +
-        "<rect x='14' y='14' width='36' height='10' rx='3' fill='#bae6fd'/>" +
-        "<rect x='14' y='27' width='14' height='8' rx='2' fill='#ffedd5'/>" +
-        "<rect x='31' y='27' width='19' height='8' rx='2' fill='#ffedd5'/>" +
-        "<circle cx='20' cy='46' r='5' fill='#111827' stroke='#374151' stroke-width='2'/>" +
-        "<circle cx='44' cy='46' r='5' fill='#111827' stroke='#374151' stroke-width='2'/>" +
-        "</svg>" +
-        "</div>",
+        "<div style='position:relative;width:36px;height:44px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 6px 10px rgba(2,6,23,.5));'>" +
+        "<div style='position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:11px solid #06b6d4;'></div>" +
+        "<svg width='32' height='32' viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg' style='position:absolute;top:2px;left:50%;transform:translateX(-50%);filter:drop-shadow(0 0 8px rgba(6,182,212,0.8));'>" +
+        "<rect x='8' y='8' width='48' height='36' rx='9' fill='#06b6d4' stroke='#0891b2' stroke-width='2.5'/>" +
+        "<rect x='12' y='13' width='40' height='11' rx='3' fill='rgba(255,255,255,0.25)'/>" +
+        "<rect x='12' y='27' width='18' height='8' rx='2' fill='rgba(255,255,255,0.18)'/>" +
+        "<rect x='34' y='27' width='18' height='8' rx='2' fill='rgba(255,255,255,0.18)'/>" +
+        "<circle cx='20' cy='44' r='5' fill='#111827' stroke='#374151' stroke-width='1.5'/>" +
+        "<circle cx='44' cy='44' r='5' fill='#111827' stroke='#374151' stroke-width='1.5'/>" +
+        "</svg></div>",
       iconSize: [36, 44],
       iconAnchor: [18, 41],
       popupAnchor: [0, -36],
@@ -88,21 +79,25 @@ export function GlobalChennaiMap({ className }: { className?: string }) {
 
   const studentIcon = useMemo(() => {
     if (!leafletModule) return null;
-
     return leafletModule.divIcon({
       className: "",
-      html: "<div style='position:relative;width:14px;height:14px;border-radius:9999px;background:#d7c2c2;border:2px solid rgba(80,46,46,.9);box-shadow:0 0 0 4px rgba(126,86,86,.2);'></div>",
-      iconSize: [14, 14],
-      iconAnchor: [7, 7],
+      html: "<div style='position:relative;width:16px;height:16px;border-radius:9999px;background:#3b82f6;border:3px solid rgba(255,255,255,0.9);box-shadow:0 0 12px rgba(59,130,246,0.8);'></div>",
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
       popupAnchor: [0, -10],
     });
   }, [leafletModule]);
 
   if (!leafletReady || !reactLeaflet) {
     return (
-      <div className={mapContainerClasses}>
-        <div className="flex h-full w-full items-center justify-center bg-surface text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Loading Chennai map...
+      <div className={outerClass}>
+        <div className="flex h-full w-full items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Loading map...
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -123,44 +118,48 @@ export function GlobalChennaiMap({ className }: { className?: string }) {
         ? markerPosition
         : CHENNAI_CENTER;
 
+  /* Forces Leaflet to recalculate its container dimensions after mount — fixes
+     the "tiles doubled" bug that appears when the container size isn't known
+     at the exact moment Leaflet first renders. */
+  function MapSizeGuard() {
+    const map = useMap();
+    useEffect(() => {
+      const t = window.setTimeout(() => map.invalidateSize(), 80);
+      return () => window.clearTimeout(t);
+    }, [map]);
+    return null;
+  }
+
   function FollowLiveBus({ position, active }: { position: [number, number]; active: boolean }) {
     const map = useMap();
-
     useEffect(() => {
       if (!active) return;
       map.panTo(position, { animate: true, duration: 0.8 });
     }, [active, map, position]);
-
     return null;
   }
 
   function SyncMapCenter({ center }: { center: [number, number] }) {
     const map = useMap();
-
     useEffect(() => {
-      const current = map.getCenter();
-      const latDiff = Math.abs(current.lat - center[0]);
-      const lngDiff = Math.abs(current.lng - center[1]);
-      if (latDiff < 0.0001 && lngDiff < 0.0001) return;
+      const c = map.getCenter();
+      if (Math.abs(c.lat - center[0]) < 0.0001 && Math.abs(c.lng - center[1]) < 0.0001) return;
       map.setView(center, map.getZoom(), { animate: true });
     }, [center, map]);
-
     return null;
   }
 
   function FocusStudentRoute({ path, active }: { path: Array<[number, number]>; active: boolean }) {
     const map = useMap();
-
     useEffect(() => {
       if (!active || path.length < 2) return;
       map.fitBounds(path, { padding: [36, 36], maxZoom: 14, animate: true });
     }, [active, map, path]);
-
     return null;
   }
 
   return (
-    <div className={mapContainerClasses}>
+    <div className={outerClass}>
       <MapContainer
         center={mapCenter}
         zoom={12}
@@ -175,9 +174,10 @@ export function GlobalChennaiMap({ className }: { className?: string }) {
         {isStudentView && routePath.length > 1 ? (
           <Polyline
             positions={routePath}
-            pathOptions={{ color: "#8f4b4b", weight: 4, opacity: 0.9 }}
+            pathOptions={{ color: "#06b6d4", weight: 3, opacity: 0.8, dashArray: "8 5" }}
           />
         ) : null}
+        <MapSizeGuard />
         <SyncMapCenter center={mapCenter} />
         <FollowLiveBus position={markerPosition} active={Boolean(tracking?.isActive)} />
         {isStudentView ? (
@@ -187,7 +187,7 @@ export function GlobalChennaiMap({ className }: { className?: string }) {
         <Marker position={markerPosition} icon={busIcon ?? undefined}>
           <Popup>
             <div className="space-y-0.5 text-xs">
-              <p className="font-semibold">PulseRide Bus</p>
+              <p className="font-bold">{busInfo?.busNumber ?? "Bus"}</p>
               <p>Status: {tracking?.isActive ? "On Trip" : "Waiting"}</p>
               <p>Speed: {tracking ? `${tracking.speedKmh.toFixed(0)} km/h` : "0 km/h"}</p>
               <p>Distance: {tracking ? `${tracking.distanceKm.toFixed(2)} km` : "0.00 km"}</p>
@@ -198,17 +198,13 @@ export function GlobalChennaiMap({ className }: { className?: string }) {
           <Marker position={studentPosition} icon={studentIcon ?? undefined}>
             <Popup>
               <div className="space-y-0.5 text-xs">
-                <p className="font-semibold">Your Location</p>
-                <p>Lat: {studentPosition[0].toFixed(5)}</p>
-                <p>Lng: {studentPosition[1].toFixed(5)}</p>
+                <p className="font-bold">Your Location</p>
+                <p>{studentPosition[0].toFixed(5)}°, {studentPosition[1].toFixed(5)}°</p>
               </div>
             </Popup>
           </Marker>
         ) : null}
       </MapContainer>
-      <div className="pointer-events-none absolute left-2 top-2 rounded-md bg-background/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-foreground">
-        Chennai Live Transit Map
-      </div>
     </div>
   );
 }
