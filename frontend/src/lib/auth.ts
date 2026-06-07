@@ -5,6 +5,7 @@ import {
   isSupabaseAuthRateLimitError,
   isSupabaseWriteAccessError,
 } from "@/lib/supabase-errors";
+import { apiUrl } from "@/lib/api";
 
 export type UserRole = "student" | "driver" | "admin";
 export type RegistrableRole = "student" | "driver";
@@ -330,7 +331,7 @@ export async function signUpUser(input: SignUpInput): Promise<RegisteredUser> {
   let approvalWritten = false;
 
   try {
-    const signupResponse = await fetch("/api/signup", {
+    const signupResponse = await fetch(apiUrl("/api/signup"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name, email: loginId, role: input.role, userId: remoteUserId }),
@@ -434,7 +435,7 @@ export async function signIn(loginId: string, password: string): Promise<AuthRes
   }
 
   const loginEmail = normalizeLoginId(data.user.email ?? normalizedLoginId);
-  const apiResponse = await fetch("/api/login", {
+  const apiResponse = await fetch(apiUrl("/api/login"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email: loginEmail }),
@@ -474,7 +475,7 @@ export async function signIn(loginId: string, password: string): Promise<AuthRes
 
 export async function getPendingApprovals(): Promise<PendingLoginApproval[]> {
   try {
-    const response = await fetch("/api/pending-approvals");
+    const response = await fetch(apiUrl("/api/pending-approvals"));
     if (response.ok) {
       const payload = (await response.json()) as { ok: boolean; approvals: PendingLoginApproval[] };
       if (payload.ok && Array.isArray(payload.approvals)) {
@@ -521,7 +522,7 @@ export async function approveUser(requestId: string) {
   const localApproval = getLocalPendingApprovals().find((item) => item.id === requestId) ?? null;
 
   try {
-    const response = await fetch("/api/approve", {
+    const response = await fetch(apiUrl("/api/approve"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id: requestId }),

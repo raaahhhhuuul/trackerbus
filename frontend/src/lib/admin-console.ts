@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { isMissingSupabaseTableError } from "@/lib/supabase-errors";
 import { getLocalApprovedDriverAccounts } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 export type BusStatus = "active" | "inactive" | "maintenance";
 export type OperationEventType = "trip_started" | "trip_ended";
@@ -94,7 +95,7 @@ export async function getPendingApprovals(): Promise<PendingLoginApproval[]> {
 }
 
 export async function approveRequest(requestId: string): Promise<boolean> {
-  const response = await fetch("/api/approve", {
+  const response = await fetch(apiUrl("/api/approve"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ id: requestId }),
@@ -324,7 +325,7 @@ export async function assignStudentToBus(
   studentId: string,
   busId: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
-  const response = await fetch("/api/assign-student-bus", {
+  const response = await fetch(apiUrl("/api/assign-student-bus"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ studentId, busId }),
@@ -472,7 +473,7 @@ export async function assignDriverToBus(busId: string, driverUserId: string | nu
     saveLocalBuses(updatedLocal);
   }
 
-  const response = await fetch("/api/assign", {
+  const response = await fetch(apiUrl("/api/assign"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ busId, driverId: driverUserId }),
