@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0d1525"/>
+  <!-- Bus body -->
+  <rect x="96" y="160" width="320" height="200" rx="24" fill="#06b6d4"/>
+  <!-- Windows row -->
+  <rect x="120" y="184" width="64" height="48" rx="8" fill="#0d1525" opacity="0.7"/>
+  <rect x="200" y="184" width="64" height="48" rx="8" fill="#0d1525" opacity="0.7"/>
+  <rect x="280" y="184" width="64" height="48" rx="8" fill="#0d1525" opacity="0.7"/>
+  <rect x="360" y="184" width="40" height="48" rx="8" fill="#0d1525" opacity="0.7"/>
+  <!-- Front face / destination board -->
+  <rect x="120" y="248" width="272" height="28" rx="6" fill="#0d1525" opacity="0.4"/>
+  <!-- Door -->
+  <rect x="148" y="256" width="48" height="88" rx="6" fill="#0d1525" opacity="0.5"/>
+  <!-- Wheels -->
+  <circle cx="168" cy="376" r="40" fill="#1e293b"/>
+  <circle cx="168" cy="376" r="22" fill="#06b6d4"/>
+  <circle cx="344" cy="376" r="40" fill="#1e293b"/>
+  <circle cx="344" cy="376" r="22" fill="#06b6d4"/>
+  <!-- Undercarriage -->
+  <rect x="96" y="340" width="320" height="20" rx="0" fill="#0891b2"/>
+  <!-- Headlight -->
+  <rect x="380" y="280" width="32" height="16" rx="4" fill="#fef9c3"/>
+  <!-- Taillight -->
+  <rect x="100" y="280" width="24" height="16" rx="4" fill="#fca5a5"/>
+</svg>
